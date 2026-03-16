@@ -15,45 +15,44 @@ default_args = {
 with DAG(
     'mfg_enterprise_automated_pipeline',
     default_args=default_args,
-    description='Full Medallion Pipeline: Batch, Stream, and SaaS Ingestion',
+    description='Full Medallion Pipeline with Automated Kafka Verification',
     schedule_interval='@hourly',
     catchup=False,
-    tags=['manufacturing', 'snowflake', 'dbt'],
+    tags=['manufacturing', 'snowflake', 'dbt', 'kafka'],
 ) as dag:
 
-    # 1. DATA GENERATION (The 'Producer' phase)
-    # Simulates real sensors and ERP data arriving in the landing zone
+    # 1. BATCH DATA GENERATION
     generate_data = BashOperator(
         task_id='generate_and_upload_batch_data',
         bash_command='python3 /opt/airflow/project/scripts/setup/manufacturing_data_producer.py'
     )
 
-    # 2. INGESTION (Moving data from Internal Stage to Bronze Table)
-    # Uses dbt macro to run the COPY INTO command
+    # 2. BATCH INGESTION (Copy Into Bronze)
     copy_batch_to_bronze = BashOperator(
         task_id='copy_stage_to_bronze',
-        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt run-operation load_internal_stage --args "{stage_name: \'MFG_INTERNAL_STAGE\', table_name: \'SENSOR_DATA_LANDING\'}"'
+        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt run-operation load_internal_stage --args "{stage_name: \'MFG_INTERNAL_STAGE\', table_name: \'SENSOR_DATA_LANDING\'}" --profiles-dir .'
     )
 
-    # 3. OBSERVABILITY (Verifying the Automated Kafka Sink)
-    # Industry Standard: Ensuring the real-time stream is actually hitting Snowflake
+    # 3. STREAM OBSERVABILITY (The dbt Fix)
+    # Checks if the Kafka Connector has delivered data in the last 1 hour
     verify_kafka_stream = BashOperator(
         task_id='verify_kafka_ingestion_health',
-        bash_command='snowflake-cli sql -q "SELECT COUNT(*) FROM MFG_BRONZE_DB.KAFKA_INGEST.RAW_SENSOR_STREAM WHERE INGESTED_AT > CURRENT_TIMESTAMP() - INTERVAL \'1 HOUR\'"'
+        bash_command="""
+        cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
+        dbt run-operation test_stream_arrival --args "{table_name: 'RAW_SENSOR_STREAM'}" --profiles-dir .
+        """
     )
 
-    # 4. TRANSFORMATION (The Medallion Flow)
-    # Builds Silver (Cleaned) and Gold (Aggregated) layers
+    # 4. MEDALLION TRANSFORMATION
     dbt_run = BashOperator(
         task_id='dbt_run_medallion',
-        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt run'
+        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt run --profiles-dir .'
     )
 
-    # 5. QUALITY GATE (Automated Testing)
-    # Ensures business logic in Gold layer is accurate
+    # 5. QUALITY GATE
     dbt_test = BashOperator(
         task_id='dbt_test_quality_gate',
-        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt test'
+        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt test --profiles-dir .'
     )
 
     # DAG Dependency Logic
