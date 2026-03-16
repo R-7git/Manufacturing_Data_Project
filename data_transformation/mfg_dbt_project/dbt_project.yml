@@ -1,0 +1,36 @@
+name: 'mfg_dbt_project'
+version: '1.0.0'
+config-version: 2
+
+profile: 'mfg_dbt_project'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  mfg_dbt_project:
+    # 1. Bronze: Raw Ingestion Layer (Mapped to MFG_BRONZE_DB.RAW_DATA)
+    bronze:
+      +database: MFG_BRONZE_DB
+      +schema: RAW_DATA
+      +materialized: view
+
+    # 2. Silver: Cleaned/Transformed Layer (Mapped to MFG_SILVER_DB.STAGING_CLEANED)
+    silver:
+      +database: MFG_SILVER_DB
+      +schema: STAGING_CLEANED
+      +materialized: table
+
+    # 3. Gold: Business/Reporting Layer (Mapped to MFG_GOLD_DB.DATA_MARTS)
+    gold:
+      +database: MFG_GOLD_DB
+      +schema: DATA_MARTS
+      +materialized: table

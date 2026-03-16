@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: silver_sensor_readings
+    description: "Cleaned and standardized manufacturing sensor data."
+    columns:
+      - name: sensor_id
+        description: "Primary identifier for the sensor."
+        tests:
+          - unique
+          - not_null
+
+      - name: health_status
+        description: "Derived status based on metric value thresholds."
+        tests:
+          - accepted_values:
+              values: ['CRITICAL', 'WARNING', 'STABLE']
+
+      - name: metric_value
+        description: "The actual reading from the machine."
+        tests:
+          - not_null

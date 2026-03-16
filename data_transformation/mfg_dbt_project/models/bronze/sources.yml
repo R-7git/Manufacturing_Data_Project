@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: raw_mfg_data
+    database: MFG_BRONZE_DB
+    schema: RAW_DATA
+    description: "Raw data ingested via Kafka, Fivetran, and Informatica"
+    tables:
+      - name: stg_sensor_data
+        description: "Real-time IoT sensor data from the manufacturing floor (Kafka)"
+      - name: stg_erp_orders
+        description: "Batch orders data from SAP (Informatica/Fivetran)"
+      - name: stg_parts_inventory
+        description: "Inventory levels from local warehouses" 
