@@ -2,35 +2,29 @@ version: 2
 
 models:
   - name: silver_sensor_readings
-    description: "Standardized and cleaned sensor data from the factory floor."
+    description: "Standardized and cleaned sensor data."
     columns:
-      - name: sensor_id
-        description: "The unique hardware identifier for the sensor (e.g., SNS-1001)."
+      - name: SENSOR_ID  # Changed to UPPERCASE
         tests:
-          - not_null  # Ensures every record has a source ID
+          - not_null
 
-      - name: metric_name
-        description: "The type of measurement being recorded."
+      - name: METRIC_NAME # Changed to UPPERCASE
         tests:
           - not_null
           - accepted_values:
-              # Industry Standard: Enforcing strictly defined metric types
               values: ['TEMPERATURE', 'PRESSURE', 'VIBRATION', 'POWER CONSUMPTION']
 
-      - name: metric_value
-        description: "The numerical reading from the sensor."
+      - name: METRIC_VALUE # Changed to UPPERCASE
         tests:
           - not_null
 
-      - name: ingestion_timestamp
-        description: "The precise UTC time the measurement was recorded."
+      - name: INGESTION_TIMESTAMP # Changed to UPPERCASE
         tests:
           - not_null
 
   - name: mfg_sensor_summary
-    description: "The Gold Layer Analytics Mart for Executive Dashboards."
     columns:
-      - name: sensor_id
+      - name: SENSOR_ID
         tests:
           - not_null
-          - unique # In the Gold Layer, we aggregate by ID, so it SHOULD be unique here
+          - unique 
