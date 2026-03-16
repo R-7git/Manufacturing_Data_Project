@@ -110,10 +110,10 @@ services:
       CONNECT_REST_PORT: 8083
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
     volumes:
-        - ./data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro
+      - ./data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro
     command: 
       - /bin/bash
-      - -c 
+      - -c
       - |
         confluent-hub install --no-prompt snowflakeinc/snowflake-kafka-connector:2.1.2
         /etc/confluent/docker/run
