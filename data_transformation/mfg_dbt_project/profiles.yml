@@ -1,0 +1,13 @@
+mfg_dbt_project:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: BKVGNQZ-UO15536  # e.g., abc1234.us-east-1
+      user: ROSHAN
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: ACCOUNTADMIN
+      warehouse: DBT_TRANSFORM_WH
+      database: MFG_SILVER_DB
+      schema: STAGING_CLEANED
+      threads: 4
