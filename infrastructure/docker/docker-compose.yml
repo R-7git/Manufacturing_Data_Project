@@ -23,7 +23,6 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      # FIXED: Uses colon and quotes for proper YAML syntax
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: password123
@@ -110,12 +109,14 @@ services:
       CONNECT_REST_PORT: 8083
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
     volumes:
-      - ../../data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro    command: 
+      - ../../data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro
+    command:
       - /bin/bash
       - -c
       - |
         confluent-hub install --no-prompt snowflakeinc/snowflake-kafka-connector:2.1.2
         /etc/confluent/docker/run
+
 volumes:
   minio_data:
   postgres_data:
