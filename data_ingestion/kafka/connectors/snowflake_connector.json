@@ -7,7 +7,7 @@
 
     "snowflake.url.name": "bkvgnqz-uo15536.snowflakecomputing.com",
     "snowflake.user.name": "ROSHAN",
-    "snowflake.private.key.file": "/Users/ms/Desktop/snowflake-manufacturing-data-platform/rsa_key.p8",
+    "snowflake.private.key.file": "/connector/secrets/rsa_key.p8",
     "snowflake.private.key.passphrase": "",
 
     "snowflake.database.name": "MANUFACTURING_DB",
