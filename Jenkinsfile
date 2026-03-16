@@ -4,18 +4,22 @@ pipeline {
     environment {
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         TF_VAR_snowflake_user     = "ROSHAN"
-        // Ensure this ID matches your Jenkins Credentials Manager
         SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
-        // Industry Standard: Pointing dbt to the workspace profiles directory
         DBT_PROFILES_DIR          = "${WORKSPACE}/data_transformation/mfg_dbt_project"
     }
 
     stages {
         stage('Step 1: Code Linting & Setup') {
             steps {
-                echo "Validating SQL standards..."
+                echo "Setting up Python environment and validating SQL..."
                 dir('data_transformation/mfg_dbt_project') {
-                    sh 'dbt clean --profiles-dir .'
+                    sh '''
+                        python3 -m venv venv
+                        . venv/bin/activate
+                        pip install --upgrade pip
+                        pip install dbt-snowflake
+                        dbt clean --profiles-dir .
+                    '''
                 }
             }
         }
@@ -34,8 +38,12 @@ pipeline {
             steps {
                 echo "Building Medallion Layers and Running Tests..."
                 dir('data_transformation/mfg_dbt_project') {
-                    sh 'dbt deps --profiles-dir .'
-                    sh 'dbt build --profiles-dir .' 
+                    // Re-activate the venv created in Step 1
+                    sh '''
+                        . venv/bin/activate
+                        dbt deps --profiles-dir .
+                        dbt build --profiles-dir .
+                    '''
                 }
             }
         }
@@ -44,7 +52,10 @@ pipeline {
             steps {
                 echo "Generating updated Lineage Graphs..."
                 dir('data_transformation/mfg_dbt_project') {
-                    sh 'dbt docs generate --profiles-dir .'
+                    sh '''
+                        . venv/bin/activate
+                        dbt docs generate --profiles-dir .
+                    '''
                 }
             }
         }
@@ -54,7 +65,6 @@ pipeline {
         success {
             echo "✅ SUCCESS: Snowflake Platform is Live!"
             echo "Triggering Airflow DAG for Data Ingestion..."
-            // INDUSTRY STANDARD: Triggering the Airflow Orchestrator via the Docker Exec bridge
             sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline'
         }
         failure {
