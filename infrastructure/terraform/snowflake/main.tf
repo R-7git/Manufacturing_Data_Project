@@ -21,8 +21,7 @@ provider "snowflake" {
 }
 
 provider "minio" {
-  # INDUSTRY FIX: Using the Docker service name 'minio' instead of 'localhost'
-  # This allows the Jenkins container to talk to the MinIO container internally.
+  # Fix: Using 'minio' service name for Jenkins internal networking
   minio_server   = "minio:9000"
   minio_user     = "admin"
   minio_password = "password123"
@@ -30,9 +29,15 @@ provider "minio" {
 }
 
 # --- 1. DATABASES ---
-resource "snowflake_database" "bronze" { name = "MFG_BRONZE_DB" }
-resource "snowflake_database" "silver" { name = "MFG_SILVER_DB" }
-resource "snowflake_database" "gold"   { name = "MFG_GOLD_DB" }
+resource "snowflake_database" "bronze" { 
+  name = "MFG_BRONZE_DB" 
+}
+resource "snowflake_database" "silver" { 
+  name = "MFG_SILVER_DB" 
+}
+resource "snowflake_database" "gold"   { 
+  name = "MFG_GOLD_DB" 
+}
 
 # --- 2. WAREHOUSES ---
 resource "snowflake_warehouse" "ingest_wh" {
@@ -71,10 +76,22 @@ resource "snowflake_table" "sensor_landing" {
   schema   = snowflake_schema.bronze_raw.name
   name     = "SENSOR_DATA_LANDING"
 
-  column { name = "SENSOR_ID"; type = "VARCHAR(16777216)" }
-  column { name = "METRIC_NAME"; type = "VARCHAR(16777216)" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ(9)" }
+  column {
+    name = "SENSOR_ID"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+  column {
+    name = "INGESTION_TIMESTAMP"
+    type = "TIMESTAMP_NTZ(9)"
+  }
 }
 
 # --- 5. INTERNAL STAGE ---
@@ -101,11 +118,19 @@ resource "snowflake_table" "raw_sensor_stream" {
   schema   = snowflake_schema.kafka_ingest.name
   name     = "RAW_SENSOR_STREAM"
 
-  column { name = "RECORD_CONTENT"; type = "VARIANT" }
-  column { name = "RECORD_METADATA"; type = "VARIANT" }
+  column {
+    name = "RECORD_CONTENT"
+    type = "VARIANT"
+  }
+  column {
+    name = "RECORD_METADATA"
+    type = "VARIANT"
+  }
   column {
     name = "INGESTED_AT"
     type = "TIMESTAMP_NTZ(9)"
-    default { expression = "CURRENT_TIMESTAMP()" }
+    default {
+      expression = "CURRENT_TIMESTAMP()"
+    }
   }
 }
