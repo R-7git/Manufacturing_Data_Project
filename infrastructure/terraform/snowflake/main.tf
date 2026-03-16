@@ -21,22 +21,18 @@ provider "snowflake" {
 }
 
 provider "minio" {
-  minio_server   = "localhost:9000"
+  # INDUSTRY FIX: Using the Docker service name 'minio' instead of 'localhost'
+  # This allows the Jenkins container to talk to the MinIO container internally.
+  minio_server   = "minio:9000"
   minio_user     = "admin"
   minio_password = "password123"
   minio_ssl      = false
 }
 
-# --- 1. DATABASES (Medallion Structure) ---
-resource "snowflake_database" "bronze" { 
-  name = "MFG_BRONZE_DB" 
-}
-resource "snowflake_database" "silver" { 
-  name = "MFG_SILVER_DB" 
-}
-resource "snowflake_database" "gold"   { 
-  name = "MFG_GOLD_DB" 
-}
+# --- 1. DATABASES ---
+resource "snowflake_database" "bronze" { name = "MFG_BRONZE_DB" }
+resource "snowflake_database" "silver" { name = "MFG_SILVER_DB" }
+resource "snowflake_database" "gold"   { name = "MFG_GOLD_DB" }
 
 # --- 2. WAREHOUSES ---
 resource "snowflake_warehouse" "ingest_wh" {
@@ -69,28 +65,16 @@ resource "snowflake_schema" "external_stages" {
   name     = "EXTERNAL_STAGES" 
 }
 
-# --- 4. BATCH LANDING TABLE (Structured) ---
+# --- 4. BATCH LANDING TABLE ---
 resource "snowflake_table" "sensor_landing" {
   database = snowflake_database.bronze.name
   schema   = snowflake_schema.bronze_raw.name
   name     = "SENSOR_DATA_LANDING"
 
-  column {
-    name = "SENSOR_ID"
-    type = "VARCHAR(16777216)"
-  }
-  column {
-    name = "METRIC_NAME"
-    type = "VARCHAR(16777216)"
-  }
-  column {
-    name = "METRIC_VALUE"
-    type = "FLOAT"
-  }
-  column {
-    name = "INGESTION_TIMESTAMP"
-    type = "TIMESTAMP_NTZ(9)"
-  }
+  column { name = "SENSOR_ID"; type = "VARCHAR(16777216)" }
+  column { name = "METRIC_NAME"; type = "VARCHAR(16777216)" }
+  column { name = "METRIC_VALUE"; type = "FLOAT" }
+  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ(9)" }
 }
 
 # --- 5. INTERNAL STAGE ---
@@ -100,14 +84,13 @@ resource "snowflake_stage" "mfg_internal_landing" {
   schema   = snowflake_schema.external_stages.name
 }
 
-# --- 6. MINIO BUCKET (Automated) ---
+# --- 6. MINIO BUCKET ---
 resource "minio_s3_bucket" "landing_bucket" {
   bucket = "manufacturing-landing-zone"
   acl    = "public"
 }
 
-# --- 7. NEW: KAFKA STREAMING INFRASTRUCTURE ---
-
+# --- 7. KAFKA STREAMING INFRASTRUCTURE ---
 resource "snowflake_schema" "kafka_ingest" {
   database = snowflake_database.bronze.name
   name     = "KAFKA_INGEST"
@@ -118,19 +101,11 @@ resource "snowflake_table" "raw_sensor_stream" {
   schema   = snowflake_schema.kafka_ingest.name
   name     = "RAW_SENSOR_STREAM"
 
-  column {
-    name = "RECORD_CONTENT"
-    type = "VARIANT"
-  }
-  column {
-    name = "RECORD_METADATA"
-    type = "VARIANT"
-  }
+  column { name = "RECORD_CONTENT"; type = "VARIANT" }
+  column { name = "RECORD_METADATA"; type = "VARIANT" }
   column {
     name = "INGESTED_AT"
     type = "TIMESTAMP_NTZ(9)"
-    default {
-      expression = "CURRENT_TIMESTAMP()"
-    }
+    default { expression = "CURRENT_TIMESTAMP()" }
   }
 }

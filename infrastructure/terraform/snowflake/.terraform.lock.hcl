@@ -6,6 +6,7 @@ provider "registry.terraform.io/aminueza/minio" {
   constraints = "3.3.0"
   hashes = [
     "h1:Dxt8sWk66elzvFcnd2CEEIAa3HzKLyX7HtSu56BkFHc=",
+    "h1:apkVsmgFVWd1jpCMnPR1Kd8WJB2UkYRiS2kc1Meefz8=",
     "zh:0c0ac1602465eaeb7045410a8ad22ee6eb82233f7bfda78bb07c58d3697bf62b",
     "zh:26a097f7523b222bb7808b76ec9fdac8c5974e440dc2438d16ef8fa4562bf297",
     "zh:47ade5b7a7ce2755291e0e4ae2125298bef682190a9917a4ca384edb23a338f4",
@@ -25,6 +26,7 @@ provider "registry.terraform.io/snowflake-labs/snowflake" {
   version     = "0.87.0"
   constraints = "0.87.0"
   hashes = [
+    "h1:ECDGqw3EFxPiQmYa2OMKwVMWUteNvkjyg5osPJD8jyw=",
     "h1:ZLNMhndrkHtCC1C5s02oxL7mXW7x1oRBtaDyiqTuvNk=",
     "zh:0fff8302d942d59bb8edcfff6ed56b21ffa104d95ed7b4361efd7a1f62c78dbb",
     "zh:11c17c4f656b201fca397fe36f0daeb4436462998dde2a23eedc060651faec48",
