@@ -2,18 +2,35 @@ version: 2
 
 models:
   - name: silver_sensor_readings
-    description: "Cleaned and standardized sensor data"
-    tests:
-      # REMOVE the old 'unique' test from the sensor_id column
-      # ADD a dbt_utils combination test or simply check for NOT NULL
+    description: "Standardized and cleaned sensor data from the factory floor."
+    columns:
+      - name: sensor_id
+        description: "The unique hardware identifier for the sensor (e.g., SNS-1001)."
+        tests:
+          - not_null  # Ensures every record has a source ID
+
+      - name: metric_name
+        description: "The type of measurement being recorded."
+        tests:
+          - not_null
+          - accepted_values:
+              # Industry Standard: Enforcing strictly defined metric types
+              values: ['TEMPERATURE', 'PRESSURE', 'VIBRATION', 'POWER CONSUMPTION']
+
+      - name: metric_value
+        description: "The numerical reading from the sensor."
+        tests:
+          - not_null
+
+      - name: ingestion_timestamp
+        description: "The precise UTC time the measurement was recorded."
+        tests:
+          - not_null
+
+  - name: mfg_sensor_summary
+    description: "The Gold Layer Analytics Mart for Executive Dashboards."
     columns:
       - name: sensor_id
         tests:
           - not_null
-      - name: ingestion_timestamp
-        tests:
-          - not_null
-
-    # Industry Standard: Check uniqueness across the Grain of the table
-    # This requires the 'dbt_utils' package or a custom test
-    # For now, let's just use NOT NULL to get the pipeline Green
+          - unique # In the Gold Layer, we aggregate by ID, so it SHOULD be unique here
