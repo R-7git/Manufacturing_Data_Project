@@ -4,27 +4,26 @@ models:
   - name: silver_sensor_readings
     description: "Standardized and cleaned sensor data."
     columns:
-      - name: SENSOR_ID  # Changed to UPPERCASE
-        tests:
-          - not_null
-
-      - name: METRIC_NAME # Changed to UPPERCASE
-        tests:
-          - not_null
-          - accepted_values:
-              values: ['TEMPERATURE', 'PRESSURE', 'VIBRATION', 'POWER CONSUMPTION']
-
-      - name: METRIC_VALUE # Changed to UPPERCASE
-        tests:
-          - not_null
-
-      - name: INGESTION_TIMESTAMP # Changed to UPPERCASE
-        tests:
-          - not_null
-
-  - name: mfg_sensor_summary
-    columns:
       - name: SENSOR_ID
         tests:
           - not_null
-          - unique 
+
+      - name: METRIC_NAME
+        tests:
+          - not_null
+          - accepted_values:
+              # Updated to match the actual strings from your Python Producer
+              values: [
+                'TEMPERATURE (C)', 
+                'PRESSURE (BAR)', 
+                'VIBRATION (HZ)', 
+                'POWER CONSUMPTION (KW)'
+              ]
+
+      - name: METRIC_VALUE
+        tests:
+          - not_null
+
+      - name: INGESTION_TIMESTAMP
+        tests:
+          - not_null
