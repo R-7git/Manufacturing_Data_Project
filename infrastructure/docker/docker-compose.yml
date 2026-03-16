@@ -23,6 +23,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      # FIXED: Uses colon and quotes for proper YAML syntax
+      SNOWFLAKE_PASSWORD: "Rosh20090798395@"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: password123
       _PIP_ADDITIONAL_REQUIREMENTS: dbt-snowflake faker confluent-kafka
@@ -52,7 +54,7 @@ services:
       - ../../:/var/jenkins_home/workspace/snowflake-mfg-pipeline
       - /var/run/docker.sock:/var/run/docker.sock
 
-  # 4. MinIO: Fixed Syntax (Removed the dashes inside environment)
+  # 4. MinIO: Local S3-compatible Storage
   minio:
     image: minio/minio:latest
     container_name: minio
