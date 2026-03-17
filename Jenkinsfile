@@ -1,7 +1,7 @@
 pipeline {
+    // This agent covers the entire pipeline, including the post-actions
     agent any
 
-    // Triggers Jenkins to check GitHub for changes every minute
     triggers {
         pollSCM('* * * * *') 
     }
@@ -17,7 +17,7 @@ pipeline {
         TF_BIN = "${WORKSPACE}/terraform_bin"
         TF_VERSION = "1.6.6"
         
-        // Uses the Docker service name 'airflow' to communicate internally
+        // Internal Docker network URL for Airflow
         AIRFLOW_URL = "http://airflow:8080/api/v1/dags/mfg_enterprise_automated_pipeline/dagRuns"
     }
 
@@ -47,11 +47,11 @@ pipeline {
 
         stage('Step 2: Trigger Airflow DAG') {
             steps {
-                // script block used to handle the API call logic
                 script {
                     echo "🚀 Triggering Airflow DAG..."
+                    // Added -f to curl to ensure Jenkins marks this as failure if the API call fails
                     sh """
-                        curl -X POST "${env.AIRFLOW_URL}" \
+                        curl -f -X POST "${env.AIRFLOW_URL}" \
                         -H "Content-Type: application/json" \
                         --user "${env.AIRFLOW_AUTH}" \
                         -d '{}'
@@ -65,12 +65,16 @@ pipeline {
         success {
             echo "✅ SUCCESS: Infrastructure deployed and DAG triggered!"
         }
+        failure {
+            echo "❌ FAILURE: Check the logs above for Terraform or API errors."
+        }
         always {
-            echo "--- Cleaning Workspace ---"
-            // Use node block to provide required context for cleanup steps
-            node('any') {  // Added the label 'any'
+            // FIX: Removed 'node(any)' which was causing the hang.
+            // Using 'script' block instead to handle housekeeping.
+            script {
+                echo "--- Cleaning Workspace ---"
                 sh "rm -rf ${env.TF_BIN} || true"
-                deleteDir()  // Clean the workspace
+                deleteDir()
             }
         }
     }
