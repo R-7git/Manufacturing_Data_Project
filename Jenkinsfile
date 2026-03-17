@@ -1,46 +1,58 @@
 pipeline {
-    // This agent covers the entire pipeline, including the post-actions
     agent any
 
     triggers {
-        pollSCM('* * * * *') 
+        // Poll every 5 minutes
+        pollSCM('H/5 * * * *')
     }
 
     environment {
-        TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
-        TF_VAR_snowflake_user     = "ROSHAN"
-        
-        // These IDs MUST exist in Jenkins -> Manage Jenkins -> Credentials
-        TF_VAR_snowflake_password = credentials('snowflake-user-password') 
-        AIRFLOW_AUTH              = credentials('airflow-credentials') 
+        // Snowflake Account (Plain String)
+        TF_VAR_snowflake_account = "BKVGNQZ-UO15536"
 
-        TF_BIN = "${WORKSPACE}/terraform_bin"
+        // Secure Credentials - Jenkins automatically creates _USR and _PSW variables
+        SF_CREDS = credentials('snowflake-user')
+        AF_CREDS = credentials('airflow-credentials')
+
+        // Terraform Setup
+        TF_BIN     = "${WORKSPACE}/terraform_bin"
         TF_VERSION = "1.6.6"
-        
-        // Internal Docker network URL for Airflow
+
+        // Path update for the session
+        PATH = "${WORKSPACE}/terraform_bin:${env.PATH}"
+
+        // Airflow API endpoint
         AIRFLOW_URL = "http://airflow:8080/api/v1/dags/mfg_enterprise_automated_pipeline/dagRuns"
     }
 
     stages {
-        stage('Step 0: Setup Terraform') {
+        stage('Step 0: Setup Terraform Binary') {
             steps {
-                sh """
-                    mkdir -p ${env.TF_BIN}
-                    curl -L https://releases.hashicorp.com/terraform/${env.TF_VERSION}/terraform_${env.TF_VERSION}_linux_amd64.zip -o terraform.zip
-                    unzip -o terraform.zip -d ${env.TF_BIN}
-                    chmod +x ${env.TF_BIN}/terraform
-                    rm terraform.zip
-                """
+                sh '''
+                    set -e
+                    mkdir -p "$TF_BIN"
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+                    unzip -o terraform.zip -d "$TF_BIN"
+                    chmod +x "$TF_BIN/terraform"
+                    rm -f terraform.zip
+                    terraform -version
+                '''
             }
         }
 
-        stage('Step 1: Infrastructure (Terraform)') {
+        stage('Step 1: Deploy STG & DW (Terraform)') {
+            environment {
+                // Mapping the credentials to the TF environment variables
+                TF_VAR_snowflake_user     = "${SF_CREDS_USR}"
+                TF_VAR_snowflake_password = "${SF_CREDS_PSW}"
+            }
             steps {
                 dir('infrastructure/terraform/snowflake') {
-                    sh """
-                        ${env.TF_BIN}/terraform init
-                        ${env.TF_BIN}/terraform apply -auto-approve
-                    """
+                    sh '''
+                        set -e
+                        terraform init -input=false
+                        terraform apply -auto-approve -input=false
+                    '''
                 }
             }
         }
@@ -48,14 +60,14 @@ pipeline {
         stage('Step 2: Trigger Airflow DAG') {
             steps {
                 script {
-                    echo "🚀 Triggering Airflow DAG..."
-                    // Added -f to curl to ensure Jenkins marks this as failure if the API call fails
-                    sh """
-                        curl -f -X POST "${env.AIRFLOW_URL}" \
-                        -H "Content-Type: application/json" \
-                        --user "${env.AIRFLOW_AUTH}" \
-                        -d '{}'
-                    """
+                    echo "🚀 Triggering Airflow Migration Pipeline..."
+                    sh '''
+                        set -e
+                        curl -f -X POST "$AIRFLOW_URL" \
+                          -H "Content-Type: application/json" \
+                          --user "$AF_CREDS_USR:$AF_CREDS_PSW" \
+                          -d '{}'
+                    '''
                 }
             }
         }
@@ -63,14 +75,12 @@ pipeline {
 
     post {
         success {
-            echo "✅ SUCCESS: Infrastructure deployed and DAG triggered!"
+            echo "✅ SUCCESS: Infrastructure deployed and Airflow DAG triggered!"
         }
         failure {
-            echo "❌ FAILURE: Check the logs above for Terraform or API errors."
+            echo "❌ FAILURE: Check Terraform logs or Airflow API connectivity."
         }
         always {
-            // FIX: Removed 'node(any)' which was causing the hang.
-            // Using 'script' block instead to handle housekeeping.
             script {
                 echo "--- Cleaning Workspace ---"
                 sh "rm -rf ${env.TF_BIN} || true"
