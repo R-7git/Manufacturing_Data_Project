@@ -19,7 +19,6 @@ pipeline {
     stages {
         stage('Step 0.1: Emergency Git Cleanup') {
             steps {
-                // Force remove any leftover git locks to stop the 'hanging'
                 sh 'rm -f .git/index.lock || true'
             }
         }
@@ -30,8 +29,9 @@ pipeline {
                     set -e
                     mkdir -p "$TF_BIN"
                     echo "--- Downloading Terraform ${TF_VERSION} ---"
-                    # FIXED URL: Added / and $
-                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+                    
+                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+                    
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
