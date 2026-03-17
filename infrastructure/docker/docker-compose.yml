@@ -44,7 +44,7 @@ services:
       airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password password123 || true &&
       (airflow webserver & airflow scheduler)"
 
-  # 3. Jenkins: Fixed Docker Socket Permission
+  # 3. Jenkins: Removed project mount to prevent workspace locks
   jenkins:
     image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
@@ -56,7 +56,7 @@ services:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=false
     volumes:
       - jenkins_data:/var/jenkins_home
-      - ../../:/var/jenkins_home/workspace/snowflake-mfg-pipeline
+      # Mount point removed: Jenkins will now manage its own /workspace folder
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
 
@@ -74,7 +74,7 @@ services:
     volumes:
       - minio_data:/data
 
-  # 5. Kafka: Added Healthcheck for Connect Stability
+  # 5. Kafka: KRaft mode
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -97,7 +97,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 6. Snowflake Kafka Connector: Fixed Key Path & Stability
+  # 6. Snowflake Kafka Connector
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.5.0
     container_name: kafka-connect
@@ -121,7 +121,6 @@ services:
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_REST_PORT: 8083
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
-      # Required for Snowflake RSA Logic
       SNOWFLAKE_PRIVATE_KEY_PATH: "/etc/kafka/secrets/rsa_key.p8"
     volumes:
       - /Users/ms/Desktop/snowflake-manufacturing-data-platform/data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro
