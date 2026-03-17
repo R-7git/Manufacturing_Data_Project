@@ -4,9 +4,7 @@ pipeline {
     environment {
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         TF_VAR_snowflake_user     = "ROSHAN"
-        // Reference credentials securely
-        SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
-        TF_VAR_snowflake_password = "${env.SNOWFLAKE_PASSWORD}"
+        TF_VAR_snowflake_password = credentials('snowflake-user-password')  // secure password
 
         TF_BIN = "${WORKSPACE}/terraform_bin"
         TF_VERSION = "1.6.6"
@@ -16,15 +14,11 @@ pipeline {
         stage('Step 0: Setup Terraform') {
             steps {
                 sh """
-                    echo "--- Creating Binary Directory ---"
-                    mkdir -p ${env.TF_BIN}
-                    
-                    echo "--- Downloading Terraform ${env.TF_VERSION} ---"
-                    curl -L https://releases.hashicorp.com/terraform/${env.TF_VERSION}/terraform_${env.TF_VERSION}_linux_amd64.zip -o terraform.zip
-                    
-                    echo "--- Extracting ---"
-                    unzip -o terraform.zip -d ${env.TF_BIN}
-                    chmod +x ${env.TF_BIN}/terraform
+                    mkdir -p ${TF_BIN}
+                    echo "--- Downloading Terraform ${TF_VERSION} ---"
+                    curl -L https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o terraform.zip
+                    unzip -o terraform.zip -d ${TF_BIN}
+                    chmod +x ${TF_BIN}/terraform
                     rm terraform.zip
                 """
             }
@@ -35,8 +29,8 @@ pipeline {
                 dir('infrastructure/terraform/snowflake') {
                     sh """
                         echo "--- Building Snowflake Infrastructure ---"
-                        ${env.TF_BIN}/terraform init
-                        ${env.TF_BIN}/terraform apply -auto-approve
+                        ${TF_BIN}/terraform init
+                        ${TF_BIN}/terraform apply -auto-approve
                     """
                 }
             }
@@ -55,7 +49,7 @@ pipeline {
         }
         always {
             echo "--- Cleaning Workspace ---"
-            sh "rm -rf ${env.TF_BIN} || true"
+            sh "rm -rf ${TF_BIN} || true"
             deleteDir()
         }
     }
