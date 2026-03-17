@@ -17,7 +17,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # 2. Airflow Orchestrator: Added missing Snowflake variables
+  # 2. Airflow Orchestrator
   airflow:
     image: apache/airflow:2.7.2-python3.11
     container_name: airflow
@@ -29,11 +29,15 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      # FIXED: Airflow now has the credentials to pass to dbt
+      # Snowflake Credentials
       TF_VAR_snowflake_account: "BKVGNQZ-UO15536"
       TF_VAR_snowflake_user: "ROSHAN"
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
       TF_VAR_snowflake_password: "Rosh20090798395@"
+      # REQUIRED DBT ENV VARS
+      SNOWFLAKE_DATABASE: "MFG_BRONZE_DB"
+      SNOWFLAKE_SCHEMA: "KAFKA_INGEST"
+      # Admin Setup
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: password123
       _PIP_ADDITIONAL_REQUIREMENTS: dbt-snowflake faker confluent-kafka
@@ -48,7 +52,7 @@ services:
       airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password password123 || true &&
       (airflow webserver & airflow scheduler)"
 
-  # 3. Jenkins: Fixed Permission Denied with root user and group_add
+  # 3. Jenkins
   jenkins:
     image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
@@ -65,7 +69,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker
 
-  # 4. MinIO: S3-compatible Storage
+  # 4. MinIO
   minio:
     image: minio/minio:latest
     container_name: minio
@@ -79,7 +83,7 @@ services:
     volumes:
       - minio_data:/data
 
-  # 5. Kafka: KRaft mode with Healthcheck
+  # 5. Kafka
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
