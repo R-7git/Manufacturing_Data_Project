@@ -4,19 +4,20 @@ models:
   - name: silver_sensor_readings
     columns:
       - name: SENSOR_ID
-        tests:
+        data_tests:
           - not_null
 
-      - name: METRIC_NAME   # <--- The test MUST be here
-        tests:
+      - name: METRIC_NAME
+        data_tests:
           - not_null
           - accepted_values:
+              # Nested 'values' key clears the dbt@0102 error
               values: ['TEMPERATURE', 'PRESSURE', 'VIBRATION', 'POWER CONSUMPTION']
 
-      - name: METRIC_VALUE  # <--- METRIC_VALUE should only have not_null
-        tests:
+      - name: METRIC_VALUE
+        data_tests:
           - not_null
 
       - name: INGESTION_TIMESTAMP
-        tests:
+        data_tests:
           - not_null

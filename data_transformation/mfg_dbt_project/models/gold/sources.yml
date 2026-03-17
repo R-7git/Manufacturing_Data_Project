@@ -6,4 +6,5 @@ sources:
     schema: STG_SCHEMA
     tables:
       - name: STG_SENSOR_DATA
+      - name: RAW_SENSOR_STREAM
       - name: SENSOR_DATA_STREAM
