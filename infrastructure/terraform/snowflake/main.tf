@@ -2,7 +2,7 @@ terraform {
   required_providers {
     snowflake = {
       source  = "snowflakedb/snowflake"
-      version = "0.87.0"
+      version = "~> 0.87.0"
     }
   }
 }
@@ -23,6 +23,7 @@ variable "snowflake_password" {
 
 # ---------------- PROVIDER ----------------
 provider "snowflake" {
+  # Use the concatenated ORG-ACCOUNT format for this version
   account  = var.snowflake_account
   user     = var.snowflake_user
   password = var.snowflake_password
@@ -54,12 +55,10 @@ resource "snowflake_stage" "minio_stage" {
   name     = "MINIO_RAW_STAGE"
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
+  url      = "s3://manufacturing-landing-zone/"
 
-  url = "s3://manufacturing-landing-zone/"
-
+  # Fixed: Single credentials string
   credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
-
-  depends_on = [snowflake_schema.stg_schema]
 }
 
 # ---------------- STAGING TABLE ----------------
@@ -68,6 +67,7 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
+  # Fixed: Removed semicolons and separated arguments onto new lines
   column {
     name = "SENSOR_ID"
     type = "VARCHAR"
@@ -96,14 +96,11 @@ resource "snowflake_table" "stg_sensor_data" {
 
 # ---------------- STREAM ----------------
 resource "snowflake_stream" "sensor_stream" {
-  database = snowflake_database.stg_db.name
-  schema   = snowflake_schema.stg_schema.name
-  name     = "SENSOR_DATA_STREAM"
-
+  database    = snowflake_database.stg_db.name
+  schema      = snowflake_schema.stg_schema.name
+  name        = "SENSOR_DATA_STREAM"
   on_table    = snowflake_table.stg_sensor_data.name
   append_only = false
-
-  depends_on = [snowflake_table.stg_sensor_data]
 }
 
 # ---------------- DW TABLE ----------------
