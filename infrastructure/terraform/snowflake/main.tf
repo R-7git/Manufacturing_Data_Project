@@ -4,14 +4,8 @@ terraform {
       source  = "snowflake-labs/snowflake"
       version = "0.87.0"
     }
-    minio = {
-      source  = "aminueza/minio"
-      version = "3.3.0"
-    }
   }
 }
-
-# --- PROVIDER CONFIGS ---
 
 provider "snowflake" {
   account  = "BKVGNQZ-UO15536"
@@ -20,125 +14,70 @@ provider "snowflake" {
   role     = "ACCOUNTADMIN" 
 }
 
-provider "minio" {
-  minio_server   = "minio:9000"
-  minio_user     = "admin"
-  minio_password = "password123"
-  minio_ssl      = false
+# --- 1. DATABASES (Migration Standard: STAGING vs DW) ---
+resource "snowflake_database" "stg_db" { name = "STG_DB" }
+resource "snowflake_database" "dw_db"  { name = "DW_DB" }
+
+# --- 2. SCHEMAS (STG_SCHEMA for Ingestion, RPT_SCHEMA for Presentation) ---
+resource "snowflake_schema" "stg_schema" {
+  database = snowflake_database.stg_db.name
+  name     = "STG_SCHEMA"
 }
 
-# --- 1. DATABASES ---
-resource "snowflake_database" "bronze" { name = "MFG_BRONZE_DB" }
-resource "snowflake_database" "silver" { name = "MFG_SILVER_DB" }
-resource "snowflake_database" "gold"   { name = "MFG_GOLD_DB" }
+resource "snowflake_schema" "rpt_schema" {
+  database = snowflake_database.dw_db.name
+  name     = "RPT_SCHEMA"
+}
 
-# --- 2. WAREHOUSES ---
-resource "snowflake_warehouse" "ingest_wh" {
-  name           = "INGEST_WH"
+# --- 3. EXTERNAL STAGE (MinIO as S3 - Curated/Raw Layer) ---
+resource "snowflake_stage" "minio_stage" {
+  name     = "MINIO_RAW_STAGE"
+  database = snowflake_database.stg_db.name
+  schema   = snowflake_schema.stg_schema.name
+  url      = "s3://manufacturing-landing-zone/"
+  credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
+  endpoint    = "http://minio:9000" # MinIO S3-Compatible Endpoint
+}
+
+# --- 4. STAGING TABLE (Source for CDC/Streams) ---
+resource "snowflake_table" "stg_sensor_data" {
+  database = snowflake_database.stg_db.name
+  schema   = snowflake_schema.stg_schema.name
+  name     = "STG_SENSOR_DATA"
+
+  column { name = "SENSOR_ID"; type = "VARCHAR(16777216)" }
+  column { name = "METRIC_NAME"; type = "VARCHAR(16777216)" }
+  column { name = "METRIC_VALUE"; type = "FLOAT" }
+  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ(9)" }
+  column { name = "METADATA_FILENAME"; type = "VARCHAR(16777216)" }
+}
+
+# --- 5. THE STREAM (Capture Changes for SCD Type 1/2) ---
+# This is the "CDC" layer you mentioned for migration
+resource "snowflake_stream" "sensor_stream" {
+  database = snowflake_database.stg_db.name
+  schema   = snowflake_schema.stg_schema.name
+  name     = "SENSOR_DATA_STREAM"
+  on_table = "${snowflake_database.stg_db.name}.${snowflake_schema.stg_schema.name}.${snowflake_table.stg_sensor_data.name}"
+  
+  append_only = false # Set to false to capture Updates/Deletes as well
+}
+
+# --- 6. TARGET TABLE (DW Layer - SCD Type 1 Destination) ---
+resource "snowflake_table" "dw_sensor_master" {
+  database = snowflake_database.dw_db.name
+  schema   = snowflake_schema.rpt_schema.name
+  name     = "DW_SENSOR_MASTER"
+
+  column { name = "SENSOR_ID"; type = "VARCHAR"; nullable = false }
+  column { name = "METRIC_NAME"; type = "VARCHAR" }
+  column { name = "METRIC_VALUE"; type = "FLOAT" }
+  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
+}
+
+# --- 7. WAREHOUSE ---
+resource "snowflake_warehouse" "mfg_wh" {
+  name           = "MFG_WH"
   warehouse_size = "X-SMALL"
   auto_suspend   = 60
-}
-
-resource "snowflake_warehouse" "dbt_wh" {
-  name           = "DBT_TRANSFORM_WH"
-  warehouse_size = "X-SMALL"
-  auto_suspend   = 60
-}
-
-# --- 3. SCHEMAS ---
-resource "snowflake_schema" "bronze_raw" { 
-  database = snowflake_database.bronze.name
-  name     = "RAW_DATA" 
-}
-resource "snowflake_schema" "silver_stg" { 
-  database = snowflake_database.silver.name
-  name     = "STAGING_CLEANED" 
-}
-resource "snowflake_schema" "gold_marts" { 
-  database = snowflake_database.gold.name
-  name     = "DATA_MARTS" 
-}
-resource "snowflake_schema" "external_stages" { 
-  database = snowflake_database.bronze.name
-  name     = "EXTERNAL_STAGES" 
-}
-resource "snowflake_schema" "kafka_ingest" {
-  database = snowflake_database.bronze.name
-  name     = "KAFKA_INGEST"
-}
-
-# --- 4. PERMISSIONS (Corrected Database-Schema Mapping) ---
-resource "snowflake_schema_grant" "grants" {
-  for_each = {
-    "raw"    = { db = snowflake_database.bronze.name, schema = snowflake_schema.bronze_raw.name },
-    "stg"    = { db = snowflake_database.silver.name, schema = snowflake_schema.silver_stg.name },
-    "marts"  = { db = snowflake_database.gold.name,   schema = snowflake_schema.gold_marts.name },
-    "kafka"  = { db = snowflake_database.bronze.name, schema = snowflake_schema.kafka_ingest.name },
-    "stages" = { db = snowflake_database.bronze.name, schema = snowflake_schema.external_stages.name }
-  }
-
-  database_name = each.value.db
-  schema_name   = each.value.schema
-  privilege     = "ALL PRIVILEGES" 
-  roles         = ["SYSADMIN"]
-}
-
-# --- 5. BATCH LANDING TABLE ---
-resource "snowflake_table" "sensor_landing" {
-  database = snowflake_database.bronze.name
-  schema   = snowflake_schema.bronze_raw.name
-  name     = "SENSOR_DATA_LANDING"
-
-  column {
-    name = "SENSOR_ID"
-    type = "VARCHAR(16777216)"
-  }
-  column {
-    name = "METRIC_NAME"
-    type = "VARCHAR(16777216)"
-  }
-  column {
-    name = "METRIC_VALUE"
-    type = "FLOAT"
-  }
-  column {
-    name = "INGESTION_TIMESTAMP"
-    type = "TIMESTAMP_NTZ(9)"
-  }
-}
-
-# --- 6. INTERNAL STAGE ---
-resource "snowflake_stage" "mfg_internal_landing" {
-  name     = "MFG_INTERNAL_STAGE"
-  database = snowflake_database.bronze.name
-  schema   = snowflake_schema.external_stages.name
-}
-
-# --- 7. KAFKA STREAMING TABLE ---
-resource "snowflake_table" "raw_sensor_stream" {
-  database = snowflake_database.bronze.name
-  schema   = snowflake_schema.kafka_ingest.name
-  name     = "RAW_SENSOR_STREAM"
-
-  column {
-    name = "RECORD_CONTENT"
-    type = "VARIANT"
-  }
-  column {
-    name = "RECORD_METADATA"
-    type = "VARIANT"
-  }
-  column { 
-    name = "INGESTED_AT"
-    type = "TIMESTAMP_NTZ(9)"
-    default {
-      expression = "CURRENT_TIMESTAMP()"
-    }
-  }
-}
-
-# --- 8. MINIO BUCKET ---
-resource "minio_s3_bucket" "landing_bucket" {    
-  bucket = "manufacturing-landing-zone"
-  acl    = "public"
 }

@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: stg_db
+    database: STG_DB
+    schema: STG_SCHEMA
+    tables:
+      - name: STG_SENSOR_DATA
+      - name: SENSOR_DATA_STREAM
+      - name: RAW_SENSOR_STREAM  # <--- ADD THIS LINE
