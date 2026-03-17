@@ -16,17 +16,10 @@ pipeline {
     }
 
     stages {
-        stage('Step 1: dbt Setup & Dependencies') {
+        stage('Step 1: Workspace Verification') {
             steps {
-                echo "--- Running dbt deps via Airflow Container ---"
-                // Using docker exec to bypass Jenkins-local permission issues
-                sh '''
-                    docker exec -u root airflow bash -c "
-                        cd /opt/airflow/project/data_transformation/mfg_dbt_project && 
-                        dbt deps --profiles-dir . &&
-                        dbt clean --profiles-dir .
-                    "
-                '''
+                echo "--- Verifying project files are present ---"
+                sh 'ls -R data_transformation/mfg_dbt_project'
             }
         }
 
@@ -34,7 +27,7 @@ pipeline {
             steps {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
-                        echo "--- Provisioning Snowflake Objects ---"
+                        echo "--- Provisioning Snowflake Infrastructure ---"
                         terraform init
                         terraform plan -out=tfplan
                         terraform apply -auto-approve tfplan
@@ -43,26 +36,22 @@ pipeline {
             }
         }
 
-        stage('Step 3: Medallion Transformation') {
+        stage('Step 3: Trigger Full Data Pipeline') {
             steps {
-                echo "--- Running Medallion Build via Airflow Container ---"
-                sh '''
-                    docker exec -u root airflow bash -c "
-                        cd /opt/airflow/project/data_transformation/mfg_dbt_project && 
-                        dbt build --profiles-dir .
-                    "
-                '''
+                echo "--- Handing off to Airflow for dbt Transformations ---"
+                // Note: If this shell command fails due to permissions, 
+                // you should trigger the DAG manually at http://localhost:8080
+                sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline || echo "Please trigger Airflow manually at localhost:8080"'
             }
         }
     }
 
     post {
         success {
-            echo "✅ SUCCESS: Jenkins Pipeline finished. Triggering Airflow DAG..."
-            sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline || true'
+            echo "✅ SUCCESS: Infrastructure is ready."
         }
         failure {
-            echo "❌ ERROR: Pipeline failed. Check dbt or Terraform logs."
+            echo "❌ ERROR: Infrastructure setup failed. Check Terraform logs."
         }
         always {
             echo "--- Cleaning Workspace ---"
