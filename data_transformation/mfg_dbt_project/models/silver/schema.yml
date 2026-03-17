@@ -1,20 +1,16 @@
+version: 2
+
 models:
   - name: silver_sensor_readings
     columns:
       - name: SENSOR_ID
         tests:
           - not_null
-          
-      - name: METRIC_NAME   # <--- Move tests here
+      - name: METRIC_VALUE
         tests:
           - not_null
           - accepted_values:
               values: ['TEMPERATURE', 'PRESSURE', 'VIBRATION', 'POWER CONSUMPTION']
-
-      - name: METRIC_VALUE  # <--- Remove accepted_values from here
-        tests:
-          - not_null
-
       - name: INGESTION_TIMESTAMP
         tests:
           - not_null
