@@ -6,8 +6,8 @@ pipeline {
     }
 
     environment {
-        TF_VAR_snowflake_organization = "BKVGNQZ" 
-        TF_VAR_snowflake_account      = "UO15536"
+        // Combined format for Snowflake Provider v0.87.0
+        TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         
         SF_CREDS = credentials('snowflake-user')
         AF_CREDS = credentials('airflow-credentials')
@@ -15,7 +15,6 @@ pipeline {
         TF_BIN     = "${WORKSPACE}/terraform_bin"
         TF_VERSION = "1.6.6"
         PATH = "${WORKSPACE}/terraform_bin:${env.PATH}"
-
         AIRFLOW_URL = "http://airflow:8080/api/v1/dags/mfg_enterprise_automated_pipeline/dagRuns"
     }
 
@@ -25,17 +24,10 @@ pipeline {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-
-                    echo "Downloading Terraform ${TF_VERSION}..."
-
-                    # ✅ FINAL FIXED URL
-                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
-
-                    "$TF_BIN/terraform" -version
                 '''
             }
         }
@@ -50,7 +42,6 @@ pipeline {
                     sh '''
                         set -e
                         rm -rf .terraform .terraform.lock.hcl
-
                         "$TF_BIN/terraform" init -upgrade -input=false
                         "$TF_BIN/terraform" apply -auto-approve -input=false
                     '''
