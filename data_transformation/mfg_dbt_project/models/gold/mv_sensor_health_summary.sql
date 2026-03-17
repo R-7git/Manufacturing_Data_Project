@@ -10,7 +10,6 @@ SELECT
     AVG(METRIC_VALUE) AS AVG_VALUE,
     MAX(METRIC_VALUE) AS PEAK_VALUE,
     COUNT(*) AS TOTAL_READINGS,
-    -- We use the SCD Type 1 Master table as the base
     CURRENT_TIMESTAMP() AS LAST_REFRESHED_AT
 FROM {{ ref('rpt_sensor_master') }}
 GROUP BY 1, 2

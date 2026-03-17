@@ -2,10 +2,12 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 
+# Industry Standard: Setting robust default arguments
 default_args = {
     'owner': 'roshan',
     'depends_on_past': False,
     'start_date': datetime(2024, 1, 1),
+    'email_on_failure': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
@@ -13,20 +15,22 @@ default_args = {
 with DAG(
     'mfg_enterprise_automated_pipeline',
     default_args=default_args,
-    description='Enterprise Migration: STG to DW with SCD Type 1 & 2',
+    description='Automated Enterprise Migration: STG to DW with SCD & Performance Views',
     schedule_interval='@hourly',
     catchup=False,
-    tags=['migration', 'snowflake', 'scd', 'json'],
+    tags=['migration', 'snowflake', 'automation', 'scd', 'json'],
 ) as dag:
 
-    # STEP 1: DATA LAKE UPLOAD (Source -> MinIO)
-    upload_to_minio = BashOperator(
+    # 1. DATA LAKE LANDING (Source -> MinIO Lake)
+    # Industry Standard: First move data to the object store (S3/MinIO)
+    upload_to_lake = BashOperator(
         task_id='upload_source_to_datalake',
         bash_command='python3 /opt/airflow/project/scripts/setup/minio_data_uploader.py'
     )
 
-    # STEP 2: BATCH INGESTION (COPY INTO STG_DB)
-    ingest_batch_to_stg = BashOperator(
+    # 2. BATCH INGESTION (MinIO -> Snowflake STG_DB)
+    # Uses the Snowflake COPY command to move data from the External Stage to the STG table
+    ingest_to_stg = BashOperator(
         task_id='ingest_batch_to_staging',
         bash_command="""
         cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
@@ -34,28 +38,23 @@ with DAG(
         """
     )
 
-    # STEP 3: SEMI-STRUCTURED PROCESSING (Flattening MongoDB/Kafka JSON)
-    process_json_data = BashOperator(
-        task_id='process_semi_structured_json',
-        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt run --select stg_mongodb_sensors'
-    )
-
-    # STEP 4: CODE MIGRATION (SCD 1, SCD 2, and Materialized Views)
-    # UPDATED: Added mv_sensor_health_summary for automated performance tuning
-    run_scd_transformations = BashOperator(
-        task_id='execute_scd_logic',
+    # 3. CODE MIGRATION (Bronze View, JSON Flattening, SCD 1, SCD 2, & Performance MVs)
+    # This step executes the full Medallion transformation in the correct sequence
+    run_migration_logic = BashOperator(
+        task_id='execute_migration_and_scd_logic',
         bash_command="""
         cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
         dbt snapshot && \
-        dbt run --select rpt_sensor_master mv_sensor_health_summary v_sensor_analytics
+        dbt run --select bronze_sensor_data stg_mongodb_sensors rpt_sensor_master mv_sensor_health_summary v_sensor_analytics
         """
     )
 
-    # STEP 5: DATA VALIDATION (RAPID Data Comparator)
+    # 4. RAPID DATA VALIDATION (Source vs Target Integrity)
+    # Compares row counts in STG_DB vs DW_DB to ensure no data loss during migration
     validate_migration = BashOperator(
         task_id='validate_stg_vs_dw_consistency',
         bash_command='python3 /opt/airflow/project/scripts/setup/data_comparator_utility.py'
     )
 
-    # --- PIPELINE DEPENDENCY LOGIC ---
-    upload_to_minio >> ingest_batch_to_stg >> process_json_data >> run_scd_transformations >> validate_migration
+    # --- PIPELINE FLOW ---
+    upload_to_lake >> ingest_to_stg >> run_migration_logic >> validate_migration
