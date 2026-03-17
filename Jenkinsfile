@@ -1,14 +1,12 @@
 pipeline {
-    agent any
+    agent { any { retries 2 } }
 
-    triggers {
-        pollSCM('* * * * *')
-    }
+    triggers { pollSCM('* * * * *') }
 
     environment {
         TF_VAR_snowflake_account = "BKVGNQZ-UO15536"
-        SF_CREDS = credentials('snowflake-user')   // Snowflake Credentials
-        AF_CREDS = credentials('airflow-credentials')  // Airflow Credentials
+        SF_CREDS = credentials('snowflake-user')
+        AF_CREDS = credentials('airflow-credentials')
 
         TF_BIN     = "${WORKSPACE}/terraform_bin"
         TF_VERSION = "1.6.6"
@@ -18,9 +16,7 @@ pipeline {
 
     stages {
         stage('Step 0.1: Emergency Git Cleanup') {
-            steps {
-                sh 'rm -f .git/index.lock || true'  // Ensure the lock file is removed if exists
-            }
+            steps { sh 'rm -f .git/index.lock || true' }
         }
 
         stage('Step 0.2: Setup Terraform Binary') {
@@ -28,16 +24,12 @@ pipeline {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-                    
-                    # Download Terraform with the correct version
                     echo "--- Downloading Terraform ${TF_VERSION} ---"
-                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-                    
-                    # Unzip and setup the binary
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
-                    terraform -version  # Check the version
+                    terraform -version
                 '''
             }
         }
@@ -75,17 +67,11 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ SUCCESS: Infrastructure live and Airflow processing!"
-        }
-        failure {
-            echo "❌ FAILURE: URL error or Authentication issue. Check console."
-        }
         always {
             script {
                 echo "--- Performing Workspace Housekeeping ---"
                 sh "rm -rf ${env.TF_BIN} || true"
-                deleteDir()  // Clean up the workspace
+                deleteDir()
             }
         }
     }
