@@ -22,7 +22,9 @@ pipeline {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+
+                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
@@ -32,7 +34,6 @@ pipeline {
 
         stage('Step 1: Deploy STG & DW (Terraform)') {
             environment {
-                // Mapping the credentials for Terraform variables
                 TF_VAR_snowflake_user     = "${SF_CREDS_USR}"
                 TF_VAR_snowflake_password = "${SF_CREDS_PSW}"
             }
@@ -40,7 +41,6 @@ pipeline {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
                         set -e
-                        # Clear old lock files to fix the provider registry conflict
                         rm -f .terraform.lock.hcl
                         terraform init -input=false
                         terraform apply -auto-approve -input=false
