@@ -61,9 +61,9 @@ class ManufacturingDataProducer:
         finally:
             cs.close()
             ctx.close()
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logging.info(f"Cleaned up local file: {file_path}")
+            #if os.path.exists(file_path):
+                #os.remove(file_path)
+                #logging.info(f"Cleaned up local file: {file_path}")
 
 if __name__ == "__main__":
     producer = ManufacturingDataProducer()
