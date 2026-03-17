@@ -1,13 +1,13 @@
+# profiles.yml
 mfg_dbt_project:
   target: dev
   outputs:
     dev:
       type: snowflake
-      account: BKVGNQZ-UO15536  # e.g., abc1234.us-east-1
-      user: ROSHAN
+      account: "{{ env_var('TF_VAR_snowflake_account') }}"
+      user: "{{ env_var('TF_VAR_snowflake_user') }}"
       password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
-      role: ACCOUNTADMIN
-      warehouse: DBT_TRANSFORM_WH
-      database: MFG_SILVER_DB
-      schema: STAGING_CLEANED
-      threads: 4
+      role: SYSADMIN
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}" # This will now be MFG_BRONZE_DB
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"     # This will now be KAFKA_INGEST
+      warehouse: COMPUTE_WH
