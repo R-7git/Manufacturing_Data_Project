@@ -29,7 +29,6 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      # Best Practice: Use a .env file for the password below
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: password123
@@ -45,7 +44,7 @@ services:
       airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password password123 || true &&
       (airflow webserver & airflow scheduler)"
 
-  # 3. Jenkins: Added Docker CLI support
+  # 3. Jenkins: Fixed Docker Socket Permission
   jenkins:
     image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
@@ -75,7 +74,7 @@ services:
     volumes:
       - minio_data:/data
 
-  # 5. Kafka: KRaft mode (No Zookeeper needed)
+  # 5. Kafka: Added Healthcheck for Connect Stability
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -92,13 +91,19 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # 6. Snowflake Kafka Connector
+  # 6. Snowflake Kafka Connector: Fixed Key Path & Stability
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.5.0
     container_name: kafka-connect
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "8083:8083"
     environment:
@@ -116,8 +121,9 @@ services:
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_REST_PORT: 8083
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      # Required for Snowflake RSA Logic
+      SNOWFLAKE_PRIVATE_KEY_PATH: "/etc/kafka/secrets/rsa_key.p8"
     volumes:
-      # Ensure this path is absolute and the file exists on your host
       - /Users/ms/Desktop/snowflake-manufacturing-data-platform/data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro
     command:
       - /bin/bash
