@@ -1,14 +1,13 @@
 terraform {
   required_providers {
     snowflake = {
-      # Updated source as per your Jenkins log warning
       source  = "snowflakedb/snowflake"
       version = "0.87.0"
     }
   }
 }
 
-# --- VARIABLES ---
+# --- THESE VARIABLES MUST BE DEFINED TO WORK WITH JENKINS ---
 variable "snowflake_account" { type = string }
 variable "snowflake_user"    { type = string }
 variable "snowflake_password" { type = string }
@@ -39,11 +38,9 @@ resource "snowflake_stage" "minio_stage" {
   name     = "MINIO_RAW_STAGE"
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
-  
-  # For MinIO, the URL and credentials are sufficient for Terraform.
-  # Snowflake handles the endpoint connectivity via the cloud provider network.
-  url         = "s3://manufacturing-landing-zone/"
+  url      = "s3://manufacturing-landing-zone/"
   credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
+  # MinIO endpoint is handled via Snowflake's internal networking or proxy
 }
 
 # --- 4. STAGING TABLE ---
@@ -74,7 +71,7 @@ resource "snowflake_table" "stg_sensor_data" {
   }
 }
 
-# --- 5. THE STREAM ---
+# --- 5. THE STREAM (CDC Logic) ---
 resource "snowflake_stream" "sensor_stream" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
@@ -84,7 +81,7 @@ resource "snowflake_stream" "sensor_stream" {
   depends_on  = [snowflake_table.stg_sensor_data]
 }
 
-# --- 6. TARGET TABLE ---
+# --- 6. DW MASTER TABLE (SCD Type 1) ---
 resource "snowflake_table" "dw_sensor_master" {
   database = snowflake_database.dw_db.name
   schema   = snowflake_schema.rpt_schema.name
