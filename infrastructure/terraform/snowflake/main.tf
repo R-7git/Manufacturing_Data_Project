@@ -2,7 +2,8 @@ terraform {
   required_providers {
     snowflake = {
       source  = "snowflakedb/snowflake"
-      version = "~> 0.87.0"
+      # Downgraded to 0.86.0 to avoid the 'panic' bug in 0.87.x
+      version = "0.86.0"
     }
   }
 }
@@ -23,7 +24,6 @@ variable "snowflake_password" {
 
 # ---------------- PROVIDER ----------------
 provider "snowflake" {
-  # Use the concatenated ORG-ACCOUNT format for this version
   account  = var.snowflake_account
   user     = var.snowflake_user
   password = var.snowflake_password
@@ -52,12 +52,10 @@ resource "snowflake_schema" "rpt_schema" {
 
 # ---------------- EXTERNAL STAGE ----------------
 resource "snowflake_stage" "minio_stage" {
-  name     = "MINIO_RAW_STAGE"
-  database = snowflake_database.stg_db.name
-  schema   = snowflake_schema.stg_schema.name
-  url      = "s3://manufacturing-landing-zone/"
-
-  # Fixed: Single credentials string
+  name        = "MINIO_RAW_STAGE"
+  database    = snowflake_database.stg_db.name
+  schema      = snowflake_schema.stg_schema.name
+  url         = "s3://manufacturing-landing-zone/"
   credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
 }
 
@@ -67,27 +65,22 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
-  # Fixed: Removed semicolons and separated arguments onto new lines
   column {
     name = "SENSOR_ID"
     type = "VARCHAR"
   }
-
   column {
     name = "METRIC_NAME"
     type = "VARCHAR"
   }
-
   column {
     name = "METRIC_VALUE"
     type = "FLOAT"
   }
-
   column {
     name = "INGESTION_TIMESTAMP"
     type = "TIMESTAMP_NTZ"
   }
-
   column {
     name = "METADATA_FILENAME"
     type = "VARCHAR"
@@ -96,9 +89,11 @@ resource "snowflake_table" "stg_sensor_data" {
 
 # ---------------- STREAM ----------------
 resource "snowflake_stream" "sensor_stream" {
-  database    = snowflake_database.stg_db.name
-  schema      = snowflake_schema.stg_schema.name
-  name        = "SENSOR_DATA_STREAM"
+  database = snowflake_database.stg_db.name
+  schema   = snowflake_schema.stg_schema.name
+  name     = "SENSOR_DATA_STREAM"
+
+  # Standard reference works perfectly in v0.86.0
   on_table    = snowflake_table.stg_sensor_data.name
   append_only = false
 }
@@ -114,17 +109,14 @@ resource "snowflake_table" "dw_sensor_master" {
     type     = "VARCHAR"
     nullable = false
   }
-
   column {
     name = "METRIC_NAME"
     type = "VARCHAR"
   }
-
   column {
     name = "METRIC_VALUE"
     type = "FLOAT"
   }
-
   column {
     name = "LAST_UPDATED_AT"
     type = "TIMESTAMP_NTZ"
