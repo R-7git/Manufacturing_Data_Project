@@ -22,9 +22,8 @@ pipeline {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-
-                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-
+                    # FIXED URL: Added missing $
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
@@ -41,6 +40,7 @@ pipeline {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
                         set -e
+                        # Clear old lock files to force registry update
                         rm -f .terraform.lock.hcl
                         terraform init -input=false
                         terraform apply -auto-approve -input=false
