@@ -6,14 +6,11 @@ models:
       - name: SENSOR_ID
         tests:
           - not_null
-      - name: METRIC_NAME
+      - name: METRIC_VALUE
         tests:
           - not_null
           - accepted_values:
               values: ['TEMPERATURE', 'PRESSURE', 'VIBRATION', 'POWER CONSUMPTION']
-      - name: METRIC_VALUE
-        tests:
-          - not_null
       - name: INGESTION_TIMESTAMP
         tests:
           - not_null
