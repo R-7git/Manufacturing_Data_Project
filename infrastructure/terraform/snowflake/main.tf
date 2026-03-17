@@ -1,7 +1,8 @@
 terraform {
   required_providers {
     snowflake = {
-      source  = "snowflake-labs/snowflake"
+      # Updated source as per your Jenkins log warning
+      source  = "snowflakedb/snowflake" 
       version = "0.87.0"
     }
   }
@@ -14,11 +15,11 @@ provider "snowflake" {
   role     = "ACCOUNTADMIN" 
 }
 
-# --- 1. DATABASES (Migration Standard: STAGING vs DW) ---
+# --- 1. DATABASES ---
 resource "snowflake_database" "stg_db" { name = "STG_DB" }
 resource "snowflake_database" "dw_db"  { name = "DW_DB" }
 
-# --- 2. SCHEMAS (STG_SCHEMA for Ingestion, RPT_SCHEMA for Presentation) ---
+# --- 2. SCHEMAS ---
 resource "snowflake_schema" "stg_schema" {
   database = snowflake_database.stg_db.name
   name     = "STG_SCHEMA"
@@ -29,17 +30,22 @@ resource "snowflake_schema" "rpt_schema" {
   name     = "RPT_SCHEMA"
 }
 
-# --- 3. EXTERNAL STAGE (MinIO as S3 - Curated/Raw Layer) ---
+# --- 3. EXTERNAL STAGE (MinIO S3-Compatible) ---
 resource "snowflake_stage" "minio_stage" {
   name     = "MINIO_RAW_STAGE"
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
   url      = "s3://manufacturing-landing-zone/"
+  
+  # Credentials for MinIO
   credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
-  endpoint    = "http://minio:9000" # MinIO S3-Compatible Endpoint
+  
+  # FIXED: Removed 'endpoint' argument as it is unsupported in this resource.
+  # For MinIO, you typically configure the endpoint in Snowflake via SQL 
+  # or use a Storage Integration.
 }
 
-# --- 4. STAGING TABLE (Source for CDC/Streams) ---
+# --- 4. STAGING TABLE ---
 resource "snowflake_table" "stg_sensor_data" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
@@ -49,39 +55,34 @@ resource "snowflake_table" "stg_sensor_data" {
     name = "SENSOR_ID"
     type = "VARCHAR(16777216)"
   }
-  
   column {
     name = "METRIC_NAME"
     type = "VARCHAR(16777216)"
   }
-  
   column {
     name = "METRIC_VALUE"
     type = "FLOAT"
   }
-  
   column {
     name = "INGESTION_TIMESTAMP"
     type = "TIMESTAMP_NTZ(9)"
   }
-  
   column {
     name = "METADATA_FILENAME"
     type = "VARCHAR(16777216)"
   }
 }
 
-# --- 5. THE STREAM (Capture Changes for SCD Type 1/2) ---
+# --- 5. THE STREAM ---
 resource "snowflake_stream" "sensor_stream" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
   name     = "SENSOR_DATA_STREAM"
   on_table = "${snowflake_database.stg_db.name}.${snowflake_schema.stg_schema.name}.${snowflake_table.stg_sensor_data.name}"
-  
   append_only = false 
 }
 
-# --- 6. TARGET TABLE (DW Layer - SCD Type 1 Destination) ---
+# --- 6. TARGET TABLE ---
 resource "snowflake_table" "dw_sensor_master" {
   database = snowflake_database.dw_db.name
   schema   = snowflake_schema.rpt_schema.name
@@ -92,17 +93,14 @@ resource "snowflake_table" "dw_sensor_master" {
     type     = "VARCHAR"
     nullable = false
   }
-  
   column {
     name = "METRIC_NAME"
     type = "VARCHAR"
   }
-  
   column {
     name = "METRIC_VALUE"
     type = "FLOAT"
   }
-  
   column {
     name = "LAST_UPDATED_AT"
     type = "TIMESTAMP_NTZ"
