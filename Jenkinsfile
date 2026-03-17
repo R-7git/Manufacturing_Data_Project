@@ -2,10 +2,14 @@ pipeline {
     agent any 
 
     environment {
+        // Terraform Snowflake Provider vars
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         TF_VAR_snowflake_user     = "ROSHAN"
-        TF_VAR_snowflake_password  = credentials('snowflake-user-password')
+        // Jenkins Credentials
         SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
+        TF_VAR_snowflake_password = "${SNOWFLAKE_PASSWORD}"
+        
+        // dbt specific vars
         DBT_PROFILES_DIR          = "${WORKSPACE}/data_transformation/mfg_dbt_project"
     }
 
@@ -16,9 +20,11 @@ pipeline {
                     sh '''
                         python3 -m venv venv
                         . venv/bin/activate
-                        pip install --upgrade pip dbt-snowflake
-                        dbt clean
-                        dbt deps
+                        pip install --upgrade pip
+                        pip install dbt-snowflake
+                        dbt --version
+                        dbt clean --profiles-dir .
+                        dbt deps --profiles-dir .
                     '''
                 }
             }
@@ -28,6 +34,7 @@ pipeline {
             steps {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
+                        terraform --version
                         terraform init
                         terraform plan -out=tfplan
                         terraform apply -auto-approve tfplan
@@ -62,6 +69,7 @@ pipeline {
     post {
         success {
             echo "✅ SUCCESS: Triggering Airflow DAG..."
+            // Ensure the Jenkins user has permission to run docker exec
             sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline'
         }
         failure {
@@ -69,6 +77,7 @@ pipeline {
             archiveArtifacts artifacts: 'data_transformation/mfg_dbt_project/logs/*.log', allowEmptyArchive: true
         }
         always {
+            // Optional: comment out cleanWs() if you need to debug files on the agent
             cleanWs()
         }
     }
