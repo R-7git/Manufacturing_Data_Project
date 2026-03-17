@@ -19,14 +19,13 @@ with DAG(
     tags=['migration', 'snowflake', 'scd', 'json'],
 ) as dag:
 
-    # STEP 1: DATA LAKE UPLOAD (Industry Standard Landing)
+    # STEP 1: DATA LAKE UPLOAD (Source -> MinIO)
     upload_to_minio = BashOperator(
         task_id='upload_source_to_datalake',
         bash_command='python3 /opt/airflow/project/scripts/setup/minio_data_uploader.py'
     )
 
     # STEP 2: BATCH INGESTION (COPY INTO STG_DB)
-    # This task triggers the 'COPY' macro we built earlier
     ingest_batch_to_stg = BashOperator(
         task_id='ingest_batch_to_staging',
         bash_command="""
@@ -35,22 +34,24 @@ with DAG(
         """
     )
 
-    # STEP 3: SEMI-STRUCTURED PROCESSING (Lateral Flatten JSON)
-    # This converts your MongoDB/Kafka JSON data into relational format in STG_DB
+    # STEP 3: SEMI-STRUCTURED PROCESSING (Flattening MongoDB/Kafka JSON)
     process_json_data = BashOperator(
         task_id='process_semi_structured_json',
         bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt run --select stg_mongodb_sensors'
     )
 
-    # STEP 4: CODE MIGRATION (SCD Type 1 Merge & SCD Type 2 Snapshots)
-    # This implements your SCD 1 (Overwrite) and SCD 2 (History) logic
+    # STEP 4: CODE MIGRATION (SCD 1, SCD 2, and Materialized Views)
+    # UPDATED: Added mv_sensor_health_summary for automated performance tuning
     run_scd_transformations = BashOperator(
         task_id='execute_scd_logic',
-        bash_command='cd /opt/airflow/project/data_transformation/mfg_dbt_project && dbt snapshot && dbt run --select rpt_sensor_master v_sensor_analytics'
+        bash_command="""
+        cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
+        dbt snapshot && \
+        dbt run --select rpt_sensor_master mv_sensor_health_summary v_sensor_analytics
+        """
     )
 
     # STEP 5: DATA VALIDATION (RAPID Data Comparator)
-    # Final step: Ensure STG_DB row counts match DW_DB row counts
     validate_migration = BashOperator(
         task_id='validate_stg_vs_dw_consistency',
         bash_command='python3 /opt/airflow/project/scripts/setup/data_comparator_utility.py'
