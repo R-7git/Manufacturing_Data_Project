@@ -67,18 +67,18 @@ resource "snowflake_schema" "kafka_ingest" {
   name     = "KAFKA_INGEST"
 }
 
-# --- 4. PERMISSIONS ---
+# --- 4. PERMISSIONS (Corrected Database-Schema Mapping) ---
 resource "snowflake_schema_grant" "grants" {
   for_each = {
-    "raw"    = snowflake_schema.bronze_raw.name,
-    "stg"    = snowflake_schema.silver_stg.name,
-    "marts"  = snowflake_schema.gold_marts.name,
-    "kafka"  = snowflake_schema.kafka_ingest.name,
-    "stages" = snowflake_schema.external_stages.name
+    "raw"    = { db = snowflake_database.bronze.name, schema = snowflake_schema.bronze_raw.name },
+    "stg"    = { db = snowflake_database.silver.name, schema = snowflake_schema.silver_stg.name },
+    "marts"  = { db = snowflake_database.gold.name,   schema = snowflake_schema.gold_marts.name },
+    "kafka"  = { db = snowflake_database.bronze.name, schema = snowflake_schema.kafka_ingest.name },
+    "stages" = { db = snowflake_database.bronze.name, schema = snowflake_schema.external_stages.name }
   }
 
-  database_name = snowflake_database.bronze.name 
-  schema_name   = each.value
+  database_name = each.value.db
+  schema_name   = each.value.schema
   privilege     = "ALL PRIVILEGES" 
   roles         = ["SYSADMIN"]
 }
