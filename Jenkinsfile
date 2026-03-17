@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     triggers {
-        pollSCM('H/5 * * * *')
+        pollSCM('* * * * *')
     }
 
     environment {
@@ -19,15 +19,22 @@ pipeline {
     }
 
     stages {
+
         stage('Step 0: Setup Terraform Binary') {
             steps {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+
+                    echo "Downloading Terraform ${TF_VERSION}..."
+
+                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
+
+                    "$TF_BIN/terraform" -version
                 '''
             }
         }
@@ -62,6 +69,7 @@ pipeline {
                 }
             }
         }
+
     }
 
     post {
