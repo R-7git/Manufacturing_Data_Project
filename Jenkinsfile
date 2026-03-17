@@ -10,37 +10,27 @@ pipeline {
         SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
         TF_VAR_snowflake_password = "${env.SNOWFLAKE_PASSWORD}"
 
-        // Database Discovery from Snowflake Explorer
+        // Database/Schema Discovery
         SNOWFLAKE_DATABASE        = "MFG_BRONZE_DB"
         SNOWFLAKE_SCHEMA          = "KAFKA_INGEST"
     }
 
     stages {
         stage('Step 1: dbt Setup & Dependencies') {
-            agent {
-                docker { 
-                    image 'ghcr.io/dbt-labs/dbt-snowflake:1.8.2'
-                    reuseNode true 
-                }
-            }
             steps {
-                dir('data_transformation/mfg_dbt_project') {
-                    sh '''
-                        echo "--- Downloading dbt dependencies ---"
-                        dbt deps --profiles-dir .
+                echo "--- Running dbt deps via Airflow Container ---"
+                // Using docker exec to bypass Jenkins-local permission issues
+                sh '''
+                    docker exec -u root airflow bash -c "
+                        cd /opt/airflow/project/data_transformation/mfg_dbt_project && 
+                        dbt deps --profiles-dir . &&
                         dbt clean --profiles-dir .
-                    '''
-                }
+                    "
+                '''
             }
         }
 
         stage('Step 2: Infrastructure (Terraform)') {
-            agent {
-                docker { 
-                    image 'hashicorp/terraform:1.6'
-                    reuseNode true
-                }
-            }
             steps {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
@@ -54,26 +44,21 @@ pipeline {
         }
 
         stage('Step 3: Medallion Transformation') {
-            agent {
-                docker { 
-                    image 'ghcr.io/dbt-labs/dbt-snowflake:1.8.2'
-                    reuseNode true
-                }
-            }
             steps {
-                dir('data_transformation/mfg_dbt_project') {
-                    sh '''
-                        echo "--- Running dbt build (Bronze -> Silver -> Gold) ---"
+                echo "--- Running Medallion Build via Airflow Container ---"
+                sh '''
+                    docker exec -u root airflow bash -c "
+                        cd /opt/airflow/project/data_transformation/mfg_dbt_project && 
                         dbt build --profiles-dir .
-                    '''
-                }
+                    "
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "✅ SUCCESS: Jenkins Pipeline finished. Triggering Airflow..."
+            echo "✅ SUCCESS: Jenkins Pipeline finished. Triggering Airflow DAG..."
             sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline || true'
         }
         failure {
