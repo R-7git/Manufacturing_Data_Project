@@ -45,22 +45,40 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
-  column { name = "SENSOR_ID"; type = "VARCHAR(16777216)" }
-  column { name = "METRIC_NAME"; type = "VARCHAR(16777216)" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ(9)" }
-  column { name = "METADATA_FILENAME"; type = "VARCHAR(16777216)" }
+  column {
+    name = "SENSOR_ID"
+    type = "VARCHAR(16777216)"
+  }
+  
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR(16777216)"
+  }
+  
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+  
+  column {
+    name = "INGESTION_TIMESTAMP"
+    type = "TIMESTAMP_NTZ(9)"
+  }
+  
+  column {
+    name = "METADATA_FILENAME"
+    type = "VARCHAR(16777216)"
+  }
 }
 
 # --- 5. THE STREAM (Capture Changes for SCD Type 1/2) ---
-# This is the "CDC" layer you mentioned for migration
 resource "snowflake_stream" "sensor_stream" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
   name     = "SENSOR_DATA_STREAM"
   on_table = "${snowflake_database.stg_db.name}.${snowflake_schema.stg_schema.name}.${snowflake_table.stg_sensor_data.name}"
   
-  append_only = false # Set to false to capture Updates/Deletes as well
+  append_only = false 
 }
 
 # --- 6. TARGET TABLE (DW Layer - SCD Type 1 Destination) ---
@@ -69,10 +87,26 @@ resource "snowflake_table" "dw_sensor_master" {
   schema   = snowflake_schema.rpt_schema.name
   name     = "DW_SENSOR_MASTER"
 
-  column { name = "SENSOR_ID"; type = "VARCHAR"; nullable = false }
-  column { name = "METRIC_NAME"; type = "VARCHAR" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
+  column {
+    name     = "SENSOR_ID"
+    type     = "VARCHAR"
+    nullable = false
+  }
+  
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+  
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+  
+  column {
+    name = "LAST_UPDATED_AT"
+    type = "TIMESTAMP_NTZ"
+  }
 }
 
 # --- 7. WAREHOUSE ---
