@@ -4,9 +4,10 @@ pipeline {
     environment {
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         TF_VAR_snowflake_user     = "ROSHAN"
+        // Reference credentials securely
         SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
         TF_VAR_snowflake_password = "${env.SNOWFLAKE_PASSWORD}"
-        
+
         TF_BIN = "${WORKSPACE}/terraform_bin"
         TF_VERSION = "1.6.6"
     }
@@ -15,9 +16,13 @@ pipeline {
         stage('Step 0: Setup Terraform') {
             steps {
                 sh """
+                    echo "--- Creating Binary Directory ---"
                     mkdir -p ${env.TF_BIN}
+                    
                     echo "--- Downloading Terraform ${env.TF_VERSION} ---"
-                    curl -L https://releases.hashicorp.com{env.TF_VERSION}/terraform_${env.TF_VERSION}_linux_amd64.zip -o terraform.zip
+                    curl -L https://releases.hashicorp.com/terraform/${env.TF_VERSION}/terraform_${env.TF_VERSION}_linux_amd64.zip -o terraform.zip
+                    
+                    echo "--- Extracting ---"
                     unzip -o terraform.zip -d ${env.TF_BIN}
                     chmod +x ${env.TF_BIN}/terraform
                     rm terraform.zip
