@@ -10,12 +10,12 @@ pipeline {
         SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
         TF_VAR_snowflake_password = "${SNOWFLAKE_PASSWORD}"
 
-        // Corrected Database/Schema from our discovery
+        // The exact Database/Schema we found in your Snowflake Explorer
         SNOWFLAKE_DATABASE        = "MFG_BRONZE_DB"
         SNOWFLAKE_SCHEMA          = "KAFKA_INGEST"
 
-        // dbt Paths
-        DBT_PROFILES_DIR          = "${WORKSPACE}/data_transformation/mfg_dbt_project"
+        // dbt Pathing
+        DBT_PROJECT_DIR           = "${WORKSPACE}/data_transformation/mfg_dbt_project"
         DBT_VENV                  = "${WORKSPACE}/data_transformation/mfg_dbt_project/venv"
     }
 
@@ -24,17 +24,15 @@ pipeline {
             steps {
                 dir('data_transformation/mfg_dbt_project') {
                     sh '''
-                        echo "--- Initializing Python Virtual Env ---"
+                        echo "--- Creating Virtual Environment ---"
                         python3 -m venv venv
                         
                         echo "--- Installing dbt-snowflake ---"
                         venv/bin/pip install --upgrade pip
                         venv/bin/pip install dbt-snowflake
                         
-                        echo "--- Verifying Installation ---"
-                        venv/bin/dbt --version
-                        
-                        echo "--- Cleaning & Installing Deps ---"
+                        echo "--- Cleaning and Loading Dependencies ---"
+                        # We call the exact path to dbt inside the venv
                         venv/bin/dbt clean --profiles-dir .
                         venv/bin/dbt deps --profiles-dir .
                     '''
@@ -42,7 +40,7 @@ pipeline {
             }
         }
 
-        stage('Step 2: Infrastructure Provisioning (Terraform)') {
+        stage('Step 2: Infrastructure (Terraform)') {
             steps {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
@@ -58,30 +56,18 @@ pipeline {
             steps {
                 dir('data_transformation/mfg_dbt_project') {
                     sh '''
-                        echo "--- Building dbt Models ---"
-                        ${DBT_VENV}/bin/dbt build --profiles-dir .
+                        echo "--- Running dbt build using venv ---"
+                        venv/bin/dbt build --profiles-dir .
                     '''
                 }
             }
         }
 
-        stage('Step 4: Data Tests') {
+        stage('Step 4: Data Quality Tests') {
             steps {
                 dir('data_transformation/mfg_dbt_project') {
                     sh '''
-                        echo "--- Running Data Quality Tests ---"
-                        ${DBT_VENV}/bin/dbt test --profiles-dir .
-                    '''
-                }
-            }
-        }
-
-        stage('Step 5: Documentation & Observability') {
-            steps {
-                dir('data_transformation/mfg_dbt_project') {
-                    sh '''
-                        echo "--- Generating Docs ---"
-                        ${DBT_VENV}/bin/dbt docs generate --profiles-dir .
+                        venv/bin/dbt test --profiles-dir .
                     '''
                 }
             }
@@ -90,19 +76,17 @@ pipeline {
 
     post {
         success {
-            echo "✅ SUCCESS: Triggering Airflow DAG..."
-            // Ensure Docker permissions are set for the Jenkins user
+            echo "✅ SUCCESS: Jenkins finished. Triggering Airflow..."
             sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline'
         }
-
         failure {
-            echo "❌ ERROR: Pipeline failed. Archiving logs..."
+            echo "❌ ERROR: Jenkins Pipeline failed."
             archiveArtifacts artifacts: 'data_transformation/mfg_dbt_project/logs/*.log', allowEmptyArchive: true
         }
-
         always {
-            echo "Cleaning Jenkins workspace..."
             cleanWs()
         }
     }
 }
+
+
