@@ -62,15 +62,16 @@ pipeline {
     }
 
     post {
-    success {
-        echo "✅ SUCCESS: Infrastructure deployed and DAG triggered!"  
-    }
-    always {
-        echo "--- Cleaning Workspace ---"
-        // Use node block to provide required context for cleanup steps
-        node('any') {  // Add a label here
-            sh "rm -rf ${env.TF_BIN} || true"
-            deleteDir()  // Clean the workspace
+        success {
+            echo "✅ SUCCESS: Infrastructure deployed and DAG triggered!"
+        }
+        always {
+            echo "--- Cleaning Workspace ---"
+            // Use node block to provide required context for cleanup steps
+            node('any') {  // Added the label 'any'
+                sh "rm -rf ${env.TF_BIN} || true"
+                deleteDir()  // Clean the workspace
+            }
         }
     }
 }
