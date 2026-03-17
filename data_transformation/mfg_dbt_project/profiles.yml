@@ -1,13 +1,13 @@
-# profiles.yml
 mfg_dbt_project:
   target: dev
   outputs:
     dev:
       type: snowflake
-      account: "{{ env_var('TF_VAR_snowflake_account') }}"
-      user: "{{ env_var('TF_VAR_snowflake_user') }}" 
-      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      # Added a default string as a second argument to clear the IDE errors
+      account: "{{ env_var('TF_VAR_snowflake_account', 'BKVGNQZ-UO15536') }}"
+      user: "{{ env_var('TF_VAR_snowflake_user', 'ROSHAN') }}" 
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', 'Rosh20090798395@') }}"
       role: SYSADMIN
-      database: "{{ env_var('SNOWFLAKE_DATABASE') }}" # This will now be MFG_BRONZE_DB
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"     # This will now be KAFKA_INGEST
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'MFG_BRONZE_DB') }}" 
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'KAFKA_INGEST') }}"     
       warehouse: COMPUTE_WH
