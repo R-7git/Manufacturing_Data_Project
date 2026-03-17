@@ -8,10 +8,22 @@ terraform {
 }
 
 # ---------------- VARIABLES ----------------
-variable "snowflake_organization" { type = string }
-variable "snowflake_account"      { type = string }
-variable "snowflake_user"         { type = string }
-variable "snowflake_password"     { type = string; sensitive = true }
+variable "snowflake_organization" { 
+  type = string 
+}
+
+variable "snowflake_account" { 
+  type = string 
+}
+
+variable "snowflake_user" { 
+  type = string 
+}
+
+variable "snowflake_password" { 
+  type      = string 
+  sensitive = true 
+}
 
 # ---------------- PROVIDER ----------------
 provider "snowflake" {
@@ -22,10 +34,16 @@ provider "snowflake" {
   role              = "ACCOUNTADMIN"
 }
 
-# ---------------- RESOURCES ----------------
-resource "snowflake_database" "stg_db" { name = "STG_DB" }
-resource "snowflake_database" "dw_db"  { name = "DW_DB" }
+# ---------------- DATABASES ----------------
+resource "snowflake_database" "stg_db" { 
+  name = "STG_DB" 
+}
 
+resource "snowflake_database" "dw_db" { 
+  name = "DW_DB" 
+}
+
+# ---------------- SCHEMAS ----------------
 resource "snowflake_schema" "stg_schema" {
   database = snowflake_database.stg_db.name
   name     = "STG_SCHEMA"
@@ -36,25 +54,50 @@ resource "snowflake_schema" "rpt_schema" {
   name     = "RPT_SCHEMA"
 }
 
+# ---------------- EXTERNAL STAGE ----------------
 resource "snowflake_stage" "minio_stage" {
   name     = "MINIO_RAW_STAGE"
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
-  url      = "s3://manufacturing-landing-zone/"
+
+  url = "s3://manufacturing-landing-zone/"
+
   credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
 }
 
+# ---------------- STAGING TABLE ----------------
 resource "snowflake_table" "stg_sensor_data" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
-  column { name = "SENSOR_ID"; type = "VARCHAR" }
-  column { name = "METRIC_NAME"; type = "VARCHAR" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ" }
-  column { name = "METADATA_FILENAME"; type = "VARCHAR" }
+
+  column {
+    name = "SENSOR_ID"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+
+  column {
+    name = "INGESTION_TIMESTAMP"
+    type = "TIMESTAMP_NTZ"
+  }
+
+  column {
+    name = "METADATA_FILENAME"
+    type = "VARCHAR"
+  }
 }
 
+# ---------------- STREAM ----------------
 resource "snowflake_stream" "sensor_stream" {
   database    = snowflake_database.stg_db.name
   schema      = snowflake_schema.stg_schema.name
@@ -63,16 +106,35 @@ resource "snowflake_stream" "sensor_stream" {
   append_only = false
 }
 
+# ---------------- DW TABLE ----------------
 resource "snowflake_table" "dw_sensor_master" {
   database = snowflake_database.dw_db.name
   schema   = snowflake_schema.rpt_schema.name
   name     = "DW_SENSOR_MASTER"
-  column { name = "SENSOR_ID"; type = "VARCHAR"; nullable = false }
-  column { name = "METRIC_NAME"; type = "VARCHAR" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
+
+  column {
+    name     = "SENSOR_ID"
+    type     = "VARCHAR"
+    nullable = false
+  }
+
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+
+  column {
+    name = "LAST_UPDATED_AT"
+    type = "TIMESTAMP_NTZ"
+  }
 }
 
+# ---------------- WAREHOUSE ----------------
 resource "snowflake_warehouse" "mfg_wh" {
   name           = "MFG_WH"
   warehouse_size = "X-SMALL"
