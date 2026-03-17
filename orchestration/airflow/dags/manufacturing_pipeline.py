@@ -28,22 +28,22 @@ with DAG(
     )
 
     # 2. BATCH INGESTION (Copy Into Bronze)
-    # Updated table_name to include MFG_BRONZE_DB.RAW_DATA path
+    # Database and Schema are now handled by dbt environment variables
     copy_batch_to_bronze = BashOperator(
         task_id='copy_stage_to_bronze',
         bash_command="""
         cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
-        dbt run-operation load_internal_stage --args "{stage_name: 'MFG_INTERNAL_STAGE', table_name: 'MFG_BRONZE_DB.RAW_DATA.SENSOR_DATA_LANDING'}" --profiles-dir .
+        dbt run-operation load_internal_stage --args "{stage_name: 'MFG_INTERNAL_STAGE', table_name: 'SENSOR_DATA_LANDING'}" --profiles-dir .
         """
     )
 
     # 3. STREAM OBSERVABILITY (The dbt Fix)
-    # Updated table_name to use the KAFKA_INGEST schema found in your Snowflake Explorer
+    # Simplified table name to prevent double-prefixing
     verify_kafka_stream = BashOperator(
         task_id='verify_kafka_ingestion_health',
         bash_command="""
         cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
-        dbt run-operation test_stream_arrival --args "{table_name: 'MFG_BRONZE_DB.KAFKA_INGEST.RAW_SENSOR_STREAM'}" --profiles-dir .
+        dbt run-operation test_stream_arrival --args "{table_name: 'RAW_SENSOR_STREAM'}" --profiles-dir .
         """
     )
 
