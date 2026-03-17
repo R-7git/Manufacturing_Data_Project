@@ -17,7 +17,7 @@ provider "snowflake" {
   account  = "BKVGNQZ-UO15536"
   user     = "ROSHAN"
   password = "Rosh20090798395@"
-  role     = "ACCOUNTADMIN" # Boss role to perform grants
+  role     = "ACCOUNTADMIN" 
 }
 
 provider "minio" {
@@ -67,8 +67,7 @@ resource "snowflake_schema" "kafka_ingest" {
   name     = "KAFKA_INGEST"
 }
 
-# --- 4. PERMISSIONS (The Fix for Task 4) ---
-# Grant SYSADMIN permission to use and create objects in these schemas
+# --- 4. PERMISSIONS ---
 resource "snowflake_schema_grant" "grants" {
   for_each = {
     "raw"    = snowflake_schema.bronze_raw.name,
@@ -78,9 +77,9 @@ resource "snowflake_schema_grant" "grants" {
     "stages" = snowflake_schema.external_stages.name
   }
 
-  database_name = snowflake_database.bronze.name # Update if silver/gold are separate DBs
+  database_name = snowflake_database.bronze.name 
   schema_name   = each.value
-  privilege     = "ALL PRIVILEGES" # Gives USAGE, CREATE TABLE, CREATE VIEW, etc.
+  privilege     = "ALL PRIVILEGES" 
   roles         = ["SYSADMIN"]
 }
 
@@ -90,10 +89,22 @@ resource "snowflake_table" "sensor_landing" {
   schema   = snowflake_schema.bronze_raw.name
   name     = "SENSOR_DATA_LANDING"
 
-  column { name = "SENSOR_ID"; type = "VARCHAR(16777216)" }
-  column { name = "METRIC_NAME"; type = "VARCHAR(16777216)" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ(9)" }
+  column {
+    name = "SENSOR_ID"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+  column {
+    name = "INGESTION_TIMESTAMP"
+    type = "TIMESTAMP_NTZ(9)"
+  }
 }
 
 # --- 6. INTERNAL STAGE ---
@@ -109,12 +120,20 @@ resource "snowflake_table" "raw_sensor_stream" {
   schema   = snowflake_schema.kafka_ingest.name
   name     = "RAW_SENSOR_STREAM"
 
-  column { name = "RECORD_CONTENT"; type = "VARIANT" }
-  column { name = "RECORD_METADATA"; type = "VARIANT" }
+  column {
+    name = "RECORD_CONTENT"
+    type = "VARIANT"
+  }
+  column {
+    name = "RECORD_METADATA"
+    type = "VARIANT"
+  }
   column { 
     name = "INGESTED_AT"
     type = "TIMESTAMP_NTZ(9)"
-    default { expression = "CURRENT_TIMESTAMP()" }
+    default {
+      expression = "CURRENT_TIMESTAMP()"
+    }
   }
 }
 
