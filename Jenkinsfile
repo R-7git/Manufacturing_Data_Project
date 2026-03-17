@@ -2,31 +2,33 @@ pipeline {
     agent any
 
     environment {
+        // Infrastructure Details
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         TF_VAR_snowflake_user     = "ROSHAN"
         
-        // Securely handle credentials
+        // Credentials
         SNOWFLAKE_PASSWORD        = credentials('snowflake-user-password')
         TF_VAR_snowflake_password = "${env.SNOWFLAKE_PASSWORD}"
 
+        // Database Discovery from Snowflake Explorer
         SNOWFLAKE_DATABASE        = "MFG_BRONZE_DB"
         SNOWFLAKE_SCHEMA          = "KAFKA_INGEST"
     }
 
     stages {
-        stage('Step 1: dbt Setup') {
+        stage('Step 1: dbt Setup & Dependencies') {
             agent {
                 docker { 
                     image 'ghcr.io/dbt-labs/dbt-snowflake:1.8.2'
-                    // This allows the container to see the files Jenkins cloned
                     reuseNode true 
                 }
             }
             steps {
                 dir('data_transformation/mfg_dbt_project') {
                     sh '''
-                        dbt clean --profiles-dir .
+                        echo "--- Downloading dbt dependencies ---"
                         dbt deps --profiles-dir .
+                        dbt clean --profiles-dir .
                     '''
                 }
             }
@@ -42,6 +44,7 @@ pipeline {
             steps {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
+                        echo "--- Provisioning Snowflake Objects ---"
                         terraform init
                         terraform plan -out=tfplan
                         terraform apply -auto-approve tfplan
@@ -50,7 +53,7 @@ pipeline {
             }
         }
 
-        stage('Step 3: Data Transformation (dbt Build)') {
+        stage('Step 3: Medallion Transformation') {
             agent {
                 docker { 
                     image 'ghcr.io/dbt-labs/dbt-snowflake:1.8.2'
@@ -59,7 +62,10 @@ pipeline {
             }
             steps {
                 dir('data_transformation/mfg_dbt_project') {
-                    sh 'dbt build --profiles-dir .'
+                    sh '''
+                        echo "--- Running dbt build (Bronze -> Silver -> Gold) ---"
+                        dbt build --profiles-dir .
+                    '''
                 }
             }
         }
@@ -67,13 +73,14 @@ pipeline {
 
     post {
         success {
-            echo "✅ SUCCESS: Pipeline completed."
-            // This triggers your Airflow DAG
+            echo "✅ SUCCESS: Jenkins Pipeline finished. Triggering Airflow..."
             sh 'docker exec airflow airflow dags trigger mfg_enterprise_automated_pipeline || true'
         }
+        failure {
+            echo "❌ ERROR: Pipeline failed. Check dbt or Terraform logs."
+        }
         always {
-            echo "Cleaning workspace..."
-            // deleteDir() is the standard method since you don't have the cleanWs plugin
+            echo "--- Cleaning Workspace ---"
             deleteDir()
         }
     }
