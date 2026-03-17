@@ -17,31 +17,22 @@ pipeline {
     }
 
     stages {
-        stage('Step 0.1: Emergency Git Cleanup') {
-            steps {
-                sh 'rm -f .git/index.lock || true'
-            }
-        }
-
-        stage('Step 0.2: Setup Terraform Binary') {
+        stage('Step 0: Setup Terraform Binary') {
             steps {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-                    echo "--- Downloading Terraform ${TF_VERSION} ---"
-                    
-                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-                    
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
-                    terraform -version
                 '''
             }
         }
 
         stage('Step 1: Deploy STG & DW (Terraform)') {
             environment {
+                // Mapping the credentials for Terraform variables
                 TF_VAR_snowflake_user     = "${SF_CREDS_USR}"
                 TF_VAR_snowflake_password = "${SF_CREDS_PSW}"
             }
@@ -49,6 +40,8 @@ pipeline {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
                         set -e
+                        # Clear old lock files to fix the provider registry conflict
+                        rm -f .terraform.lock.hcl
                         terraform init -input=false
                         terraform apply -auto-approve -input=false
                     '''

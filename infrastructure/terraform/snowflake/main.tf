@@ -1,36 +1,40 @@
 terraform {
   required_providers {
     snowflake = {
-      # Official registry source as per latest provider standards
+      # Official registry as per your Jenkins log warning
       source  = "snowflakedb/snowflake"
       version = "0.87.0"
     }
   }
 }
 
+# --- VARIABLE DEFINITIONS (Required for Jenkins Integration) ---
+variable "snowflake_account" { type = string }
+variable "snowflake_user"    { type = string }
+variable "snowflake_password" { type = string }
+
 provider "snowflake" {
-  account  = "BKVGNQZ-UO15536"
-  user     = "ROSHAN"
-  password = "Rosh20090798395@"
+  account  = var.snowflake_account
+  user     = var.snowflake_user
+  password = var.snowflake_password
   role     = "ACCOUNTADMIN" 
 }
 
-# --- 1. DATABASES (Migration Standard: STAGING vs DW) ---
+# --- 1. DATABASES ---
 resource "snowflake_database" "stg_db" { name = "STG_DB" }
 resource "snowflake_database" "dw_db"  { name = "DW_DB" }
 
-# --- 2. SCHEMAS (STG_SCHEMA for Ingestion, RPT_SCHEMA for Presentation) ---
+# --- 2. SCHEMAS ---
 resource "snowflake_schema" "stg_schema" {
   database = snowflake_database.stg_db.name
   name     = "STG_SCHEMA"
 }
-
 resource "snowflake_schema" "rpt_schema" {
   database = snowflake_database.dw_db.name
   name     = "RPT_SCHEMA"
 }
 
-# --- 3. EXTERNAL STAGE (MinIO S3-Compatible) ---
+# --- 3. EXTERNAL STAGE ---
 resource "snowflake_stage" "minio_stage" {
   name     = "MINIO_RAW_STAGE"
   database = snowflake_database.stg_db.name
@@ -39,7 +43,7 @@ resource "snowflake_stage" "minio_stage" {
   credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
 }
 
-# --- 4. STAGING TABLE (Source for CDC/Streams) ---
+# --- 4. STAGING TABLE ---
 resource "snowflake_table" "stg_sensor_data" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
@@ -49,40 +53,35 @@ resource "snowflake_table" "stg_sensor_data" {
     name = "SENSOR_ID"
     type = "VARCHAR(16777216)"
   }
-  
   column {
     name = "METRIC_NAME"
     type = "VARCHAR(16777216)"
   }
-  
   column {
     name = "METRIC_VALUE"
     type = "FLOAT"
   }
-  
   column {
     name = "INGESTION_TIMESTAMP"
     type = "TIMESTAMP_NTZ(9)"
   }
-  
   column {
     name = "METADATA_FILENAME"
     type = "VARCHAR(16777216)"
   }
 }
 
-# --- 5. THE STREAM (Capture Changes for SCD Type 1/2) ---
+# --- 5. THE STREAM (CDC Logic) ---
 resource "snowflake_stream" "sensor_stream" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
   name     = "SENSOR_DATA_STREAM"
   on_table = "${snowflake_database.stg_db.name}.${snowflake_schema.stg_schema.name}.${snowflake_table.stg_sensor_data.name}"
-  
   append_only = false 
   depends_on  = [snowflake_table.stg_sensor_data]
 }
 
-# --- 6. TARGET TABLE (DW Layer - SCD Type 1 Destination) ---
+# --- 6. DW MASTER TABLE (SCD Type 1) ---
 resource "snowflake_table" "dw_sensor_master" {
   database = snowflake_database.dw_db.name
   schema   = snowflake_schema.rpt_schema.name
@@ -93,17 +92,14 @@ resource "snowflake_table" "dw_sensor_master" {
     type     = "VARCHAR"
     nullable = false
   }
-  
   column {
     name = "METRIC_NAME"
     type = "VARCHAR"
   }
-  
   column {
     name = "METRIC_VALUE"
     type = "FLOAT"
   }
-  
   column {
     name = "LAST_UPDATED_AT"
     type = "TIMESTAMP_NTZ"
