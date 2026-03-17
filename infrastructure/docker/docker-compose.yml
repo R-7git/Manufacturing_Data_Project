@@ -29,14 +29,20 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      
+      # FIX: Enable Basic Auth so Jenkins can trigger the DAG via API
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+      
       # Snowflake Credentials
       TF_VAR_snowflake_account: "BKVGNQZ-UO15536"
       TF_VAR_snowflake_user: "ROSHAN"
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
       TF_VAR_snowflake_password: "Rosh20090798395@"
+      
       # REQUIRED DBT ENV VARS
       SNOWFLAKE_DATABASE: "MFG_BRONZE_DB"
       SNOWFLAKE_SCHEMA: "KAFKA_INGEST"
+      
       # Admin Setup
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: password123
@@ -132,6 +138,7 @@ services:
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
       SNOWFLAKE_PRIVATE_KEY_PATH: "/etc/kafka/secrets/rsa_key.p8"
     volumes:
+      # Ensure this local path is correct for your RSA key
       - /Users/ms/Desktop/snowflake-manufacturing-data-platform/data_ingestion/kafka/connectors/rsa_key_clean.p8:/etc/kafka/secrets/rsa_key.p8:ro
     command:
       - /bin/bash
