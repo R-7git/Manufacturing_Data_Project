@@ -138,7 +138,7 @@ resource "snowflake_table" "raw_sensor_stream" {
 }
 
 # --- 8. MINIO BUCKET ---
-resource "minio_s3_bucket" "landing_bucket" {
+resource "minio_s3_bucket" "landing_bucket" {    
   bucket = "manufacturing-landing-zone"
   acl    = "public"
 }
