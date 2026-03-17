@@ -67,9 +67,11 @@ pipeline {
         }
         always {
             echo "--- Cleaning Workspace ---"
-            // FIX: Use env.TF_BIN to ensure the post-condition can find the variable
-            sh "rm -rf ${env.TF_BIN} || true"
-            deleteDir()
+            // FIX: Use node block to provide required context for cleanup steps
+            node {
+                sh "rm -rf ${env.TF_BIN} || true"
+                deleteDir()  // Clean the workspace
+            }
         }
     }
 }
