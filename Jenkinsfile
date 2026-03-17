@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     triggers {
-        // Industry Standard: Poll GitHub every 5 minutes for changes
+        // Industry Standard: Poll GitHub every minute for changes
         pollSCM('* * * * *')
     }
 
@@ -26,14 +26,20 @@ pipeline {
     }
 
     stages {
-        stage('Step 0: Setup Terraform Binary') {
+        stage('Step 0.1: Fix Git Locks') {
+            steps {
+                // This removes any crashed git processes to prevent "index.lock" errors
+                sh 'rm -f .git/index.lock || true'
+            }
+        }
+
+        stage('Step 0.2: Setup Terraform Binary') {
             steps {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
                     
                     echo "--- Downloading Terraform ${TF_VERSION} ---"
-                    # Corrected URL syntax for Hashicorp releases
                     curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     
                     unzip -o terraform.zip -d "$TF_BIN"
@@ -88,9 +94,9 @@ pipeline {
             echo "❌ FAILURE: Check Terraform download, Jenkins credentials, or Airflow API connectivity."
         }
         always {
+            // This ensures the cleanup happens inside the agent/node context
             script {
                 echo "--- Performing Workspace Housekeeping ---"
-                // Clean the binary folder using the environment variable
                 sh "rm -rf ${env.TF_BIN} || true"
                 deleteDir()
             }
