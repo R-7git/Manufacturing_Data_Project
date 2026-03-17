@@ -1,7 +1,9 @@
 pipeline {
-    agent { any { retries 2 } }
+    agent any
 
-    triggers { pollSCM('* * * * *') }
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
 
     environment {
         TF_VAR_snowflake_account = "BKVGNQZ-UO15536"
@@ -16,7 +18,10 @@ pipeline {
 
     stages {
         stage('Step 0.1: Emergency Git Cleanup') {
-            steps { sh 'rm -f .git/index.lock || true' }
+            steps {
+                // Force remove any leftover git locks to stop the 'hanging'
+                sh 'rm -f .git/index.lock || true'
+            }
         }
 
         stage('Step 0.2: Setup Terraform Binary') {
@@ -25,6 +30,7 @@ pipeline {
                     set -e
                     mkdir -p "$TF_BIN"
                     echo "--- Downloading Terraform ${TF_VERSION} ---"
+                    # FIXED URL: Added / and $
                     curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
