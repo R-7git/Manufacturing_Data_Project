@@ -6,7 +6,10 @@ pipeline {
     }
 
     environment {
-        TF_VAR_snowflake_account = "BKVGNQZ"   // safer format
+        // Values from your Snowflake query result
+        TF_VAR_snowflake_organization = "BKVGNQZ" 
+        TF_VAR_snowflake_account      = "UO15536"
+        
         SF_CREDS = credentials('snowflake-user')
         AF_CREDS = credentials('airflow-credentials')
 
@@ -17,22 +20,15 @@ pipeline {
     }
 
     stages {
-
         stage('Step 0: Setup Terraform Binary') {
             steps {
                 sh '''
                     set -e
                     mkdir -p "$TF_BIN"
-
-                    echo "--- Downloading Terraform ${TF_VERSION} ---"
-
-                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
                     unzip -o terraform.zip -d "$TF_BIN"
                     chmod +x "$TF_BIN/terraform"
                     rm -f terraform.zip
-
-                    terraform -version
                 '''
             }
         }
@@ -41,17 +37,17 @@ pipeline {
             environment {
                 TF_VAR_snowflake_user     = "${SF_CREDS_USR}"
                 TF_VAR_snowflake_password = "${SF_CREDS_PSW}"
-                TF_VAR_snowflake_account  = "${env.TF_VAR_snowflake_account}"
             }
             steps {
                 dir('infrastructure/terraform/snowflake') {
                     sh '''
                         set -e
-
-                        # Clean old providers completely
+                        # Force clean the environment to fix provider conflicts
                         rm -rf .terraform .terraform.lock.hcl
-
+                        
                         terraform init -upgrade -input=false
+                        
+                        # Apply changes
                         terraform apply -auto-approve -input=false
                     '''
                 }
@@ -61,7 +57,6 @@ pipeline {
         stage('Step 2: Trigger Airflow DAG') {
             steps {
                 script {
-                    echo "🚀 Triggering Airflow Migration Pipeline..."
                     sh '''
                         set -e
                         curl -f -X POST "$AIRFLOW_URL" \
@@ -77,7 +72,6 @@ pipeline {
     post {
         always {
             script {
-                echo "--- Performing Workspace Housekeeping ---"
                 sh "rm -rf ${env.TF_BIN} || true"
                 deleteDir()
             }
