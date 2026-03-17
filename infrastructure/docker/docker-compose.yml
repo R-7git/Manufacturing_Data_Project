@@ -17,7 +17,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # 2. Airflow Orchestrator
+  # 2. Airflow Orchestrator: Added missing Snowflake variables
   airflow:
     image: apache/airflow:2.7.2-python3.11
     container_name: airflow
@@ -29,7 +29,11 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      # FIXED: Airflow now has the credentials to pass to dbt
+      TF_VAR_snowflake_account: "BKVGNQZ-UO15536"
+      TF_VAR_snowflake_user: "ROSHAN"
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
+      TF_VAR_snowflake_password: "Rosh20090798395@"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: password123
       _PIP_ADDITIONAL_REQUIREMENTS: dbt-snowflake faker confluent-kafka
@@ -49,7 +53,6 @@ services:
     image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
     user: root
-    # This allows Jenkins to communicate with the host's Docker engine
     group_add:
       - '0'
     ports:
