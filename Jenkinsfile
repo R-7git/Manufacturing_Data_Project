@@ -6,7 +6,6 @@ pipeline {
     }
 
     environment {
-        // Combined format for Snowflake Provider v0.87.0
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         
         SF_CREDS = credentials('snowflake-user')
@@ -19,57 +18,50 @@ pipeline {
     }
 
     stages {
-
-        stage('Step 0: Setup Terraform Binary') {
+        stage('Step 0: Setup Terraform') {
             steps {
-                sh '''
+                sh """
                     set -e
-                    mkdir -p "$TF_BIN"
-
-                    echo "Downloading Terraform ${TF_VERSION}..."
-
-                    curl -s -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-
-                    unzip -o terraform.zip -d "$TF_BIN"
-                    chmod +x "$TF_BIN/terraform"
+                    mkdir -p "${TF_BIN}"
+                    curl -s -L "https://releases.hashicorp.com{TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
+                    unzip -o terraform.zip -d "${TF_BIN}"
+                    chmod +x "${TF_BIN}/terraform"
                     rm -f terraform.zip
-
-                    "$TF_BIN/terraform" -version
-                '''
+                """
             }
         }
 
-        stage('Step 1: Deploy STG & DW (Terraform)') {
+        stage('Step 1: Deploy Snowflake Infrastructure') {
             environment {
                 TF_VAR_snowflake_user     = "${SF_CREDS_USR}"
                 TF_VAR_snowflake_password = "${SF_CREDS_PSW}"
             }
             steps {
                 dir('infrastructure/terraform/snowflake') {
-                    sh '''
+                    sh """
                         set -e
                         rm -rf .terraform .terraform.lock.hcl
-                        "$TF_BIN/terraform" init -upgrade -input=false
-                        "$TF_BIN/terraform" apply -auto-approve -input=false
-                    '''
+                        "${TF_BIN}/terraform" init -upgrade -input=false
+                        "${TF_BIN}/terraform" apply -auto-approve -input=false
+                    """
                 }
             }
         }
 
-        stage('Step 2: Trigger Airflow DAG') {
+        stage('Step 2: Trigger Airflow Pipeline') {
             steps {
                 script {
-                    sh '''
+                    echo "🚀 Infrastructure verified. Triggering Airflow DAG..."
+                    sh """
                         set -e
-                        curl -f -X POST "$AIRFLOW_URL" \
+                        curl -f -X POST "${AIRFLOW_URL}" \
                           -H "Content-Type: application/json" \
-                          --user "$AF_CREDS_USR:$AF_CREDS_PSW" \
+                          --user "${AF_CREDS_USR}:${AF_CREDS_PSW}" \
                           -d '{}'
-                    '''
+                    """
                 }
             }
         }
-
     }
 
     post {

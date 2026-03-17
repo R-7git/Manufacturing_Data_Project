@@ -2,25 +2,15 @@ terraform {
   required_providers {
     snowflake = {
       source  = "snowflakedb/snowflake"
-      # Downgraded to 0.86.0 to avoid the 'panic' bug in 0.87.x
-      version = "0.86.0"
+      version = "~> 0.86.0" 
     }
   }
 }
 
 # ---------------- VARIABLES ----------------
-variable "snowflake_account" {
-  type = string
-}
-
-variable "snowflake_user" {
-  type = string
-}
-
-variable "snowflake_password" {
-  type      = string
-  sensitive = true
-}
+variable "snowflake_account" { type = string }
+variable "snowflake_user"    { type = string }
+variable "snowflake_password" { type = string; sensitive = true }
 
 # ---------------- PROVIDER ----------------
 provider "snowflake" {
@@ -31,13 +21,8 @@ provider "snowflake" {
 }
 
 # ---------------- DATABASES ----------------
-resource "snowflake_database" "stg_db" {
-  name = "STG_DB"
-}
-
-resource "snowflake_database" "dw_db" {
-  name = "DW_DB"
-}
+resource "snowflake_database" "stg_db" { name = "STG_DB" }
+resource "snowflake_database" "dw_db"  { name = "DW_DB" }
 
 # ---------------- SCHEMAS ----------------
 resource "snowflake_schema" "stg_schema" {
@@ -65,38 +50,24 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
-  column {
-    name = "SENSOR_ID"
-    type = "VARCHAR"
-  }
-  column {
-    name = "METRIC_NAME"
-    type = "VARCHAR"
-  }
-  column {
-    name = "METRIC_VALUE"
-    type = "FLOAT"
-  }
-  column {
-    name = "INGESTION_TIMESTAMP"
-    type = "TIMESTAMP_NTZ"
-  }
-  column {
-    name = "METADATA_FILENAME"
-    type = "VARCHAR"
-  }
+  column { name = "SENSOR_ID";           type = "VARCHAR" }
+  column { name = "METRIC_NAME";         type = "VARCHAR" }
+  column { name = "METRIC_VALUE";        type = "FLOAT"   }
+  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ" }
+  column { name = "METADATA_FILENAME";   type = "VARCHAR" }
 }
 
-# ---------------- STREAM ----------------
+# ---------------- STREAM (MANUALLY MANAGED) ----------------
+# We are commenting this out because the Snowflake Terraform Provider 
+# (v0.86 - v0.87) has a known 'panic' bug with the Stream resource.
+/*
 resource "snowflake_stream" "sensor_stream" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
   name     = "SENSOR_DATA_STREAM"
-
-  # Standard reference works perfectly in v0.86.0
-  on_table    = snowflake_table.stg_sensor_data.name
-  append_only = false
+  on_table = snowflake_table.stg_sensor_data.name
 }
+*/
 
 # ---------------- DW TABLE ----------------
 resource "snowflake_table" "dw_sensor_master" {
@@ -104,23 +75,10 @@ resource "snowflake_table" "dw_sensor_master" {
   schema   = snowflake_schema.rpt_schema.name
   name     = "DW_SENSOR_MASTER"
 
-  column {
-    name     = "SENSOR_ID"
-    type     = "VARCHAR"
-    nullable = false
-  }
-  column {
-    name = "METRIC_NAME"
-    type = "VARCHAR"
-  }
-  column {
-    name = "METRIC_VALUE"
-    type = "FLOAT"
-  }
-  column {
-    name = "LAST_UPDATED_AT"
-    type = "TIMESTAMP_NTZ"
-  }
+  column { name = "SENSOR_ID";      type = "VARCHAR"; nullable = false }
+  column { name = "METRIC_NAME";    type = "VARCHAR" }
+  column { name = "METRIC_VALUE";   type = "FLOAT"   }
+  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
 }
 
 # ---------------- WAREHOUSE ----------------
