@@ -70,8 +70,7 @@ resource "snowflake_stage" "minio_stage" {
   name        = "MINIO_RAW_STAGE"
   database    = snowflake_database.stg_db.name
   schema      = snowflake_schema.stg_schema.name
-  url         = "s3://manufacturing-landing-zone/"
-  credentials = "AWS_KEY_ID='admin' AWS_SECRET_KEY='password123'"
+  
 
   lifecycle {
     ignore_changes = all
