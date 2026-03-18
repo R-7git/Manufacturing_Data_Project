@@ -36,7 +36,7 @@ class RapidDataComparator:
                 logging.info("✅ SUCCESS: Data Migration is 100% Consistent.")
             else:
                 diff = abs(source_count - target_count)
-                logging.warning(f"⚠️ DISCREPANCY: Found a difference of {diff} rows!")
+                logging.warning(f"⚠️ DISCREPANCY: Found a difference of {diff} rows!") 
 
         except Exception as e:
             logging.error(f"Validation Failed: {e}")

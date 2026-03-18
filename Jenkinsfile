@@ -34,7 +34,7 @@ pipeline {
                         echo "Retry \$i failed... retrying"
                         sleep 5
                     done
-
+                
                     if [ ! -f terraform.zip ]; then
                         echo "Download failed!"
                         exit 1
