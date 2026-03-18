@@ -1,19 +1,14 @@
 from airflow import DAG
+from airflow.sensors.filesystem import FileSensor
 from airflow.operators.bash import BashOperator
 from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
 from datetime import datetime, timedelta
 
-# --- SLACK ALERT FUNCTION ---
 def send_slack_alert(context):
-    slack_msg = f"""
-            :red_circle: *PIPELINE FAILURE*
-            *Task*: {context.get('task_instance').task_id}
-            *Dag*: {context.get('task_instance').dag_id}
-            *Log*: <{context.get('task_instance').log_url}|Click here to view log>
-            """
+    slack_msg = f":red_circle: *PIPELINE FAILURE*\n*Task*: {context.get('task_instance').task_id}"
     alert = SlackWebhookOperator(
         task_id='slack_failure_notification',
-        http_conn_id='slack_conn', # Define this in Airflow UI Admin -> Connections
+        http_conn_id='slack_conn',
         message=slack_msg,
         channel='#data-alerts'
     )
@@ -21,7 +16,6 @@ def send_slack_alert(context):
 
 default_args = {
     'owner': 'roshan',
-    'depends_on_past': False,
     'start_date': datetime(2024, 1, 1),
     'on_failure_callback': send_slack_alert,
     'retries': 1,
@@ -31,16 +25,18 @@ default_args = {
 with DAG(
     'mfg_enterprise_automated_pipeline',
     default_args=default_args,
-    description='Full Enterprise Automated Medallion Pipeline',
-    schedule_interval=timedelta(minutes=30), # Runs every 30 mins
+    schedule_interval=timedelta(minutes=30),
     catchup=False,
-    tags=['enterprise', 'automation', 'slack'],
 ) as dag:
 
-    # 1. SENSOR: Wait for CSV files from Docker Producer
-    wait_for_files = BashOperator(
+    # 1. SENSOR: Wait for CSV files (Instead of failing, it will 'poke' every 60s)
+    wait_for_files = FileSensor(
         task_id='sense_incoming_csv_files',
-        bash_command='ls /opt/airflow/project/mfg_sensor_batch_*.csv'
+        filepath='mfg_sensor_batch_*.csv',
+        fs_conn_id='fs_default',
+        poke_interval=60,
+        timeout=600,
+        mode='poke'
     )
 
     # 2. UPLOAD TO MINIO
@@ -58,17 +54,16 @@ with DAG(
         """
     )
 
-    # 4. DBT TRANSFORMATION (Bronze -> Silver -> Gold)
+    # 4. DBT TRANSFORMATION
     run_dbt = BashOperator(
         task_id='dbt_medallion_transformation',
         bash_command="""
         cd /opt/airflow/project/data_transformation/mfg_dbt_project && \
-        dbt snapshot && \
-        dbt run
+        dbt snapshot && dbt run
         """
     )
 
-    # 5. VALIDATION & ARCHIVE (Final cleanup)
+    # 5. VALIDATION & ARCHIVE
     validate_and_archive = BashOperator(
         task_id='validate_and_cleanup',
         bash_command="""
