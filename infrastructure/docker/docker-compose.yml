@@ -116,6 +116,7 @@ services:
     container_name: airflow
     user: "${AIRFLOW_UID:-50000}:0"
     environment:
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
