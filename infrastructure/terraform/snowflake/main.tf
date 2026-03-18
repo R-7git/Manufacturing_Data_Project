@@ -8,18 +8,9 @@ terraform {
 }
 
 # ---------------- VARIABLES ----------------
-variable "snowflake_account" {
-  type = string
-}
-
-variable "snowflake_user" {
-  type = string
-}
-
-variable "snowflake_password" {
-  type      = string
-  sensitive = true
-}
+variable "snowflake_account" { type = string }
+variable "snowflake_user"    { type = string }
+variable "snowflake_password" { type = string, sensitive = true }
 
 # ---------------- PROVIDER ----------------
 provider "snowflake" {
@@ -34,8 +25,7 @@ resource "snowflake_database" "stg_db" {
   name = "STG_DB"
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = all
+    ignore_changes = all
   }
 }
 
@@ -43,8 +33,7 @@ resource "snowflake_database" "dw_db" {
   name = "DW_DB"
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = all
+    ignore_changes = all
   }
 }
 
@@ -86,11 +75,30 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
-  column { name = "SENSOR_ID";           type = "VARCHAR" }
-  column { name = "METRIC_NAME";         type = "VARCHAR" }
-  column { name = "METRIC_VALUE";        type = "FLOAT" }
-  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ" }
-  column { name = "METADATA_FILENAME";   type = "VARCHAR" }
+  column {
+    name = "SENSOR_ID"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+
+  column {
+    name = "INGESTION_TIMESTAMP"
+    type = "TIMESTAMP_NTZ"
+  }
+
+  column {
+    name = "METADATA_FILENAME"
+    type = "VARCHAR"
+  }
 
   lifecycle {
     ignore_changes = all
@@ -103,10 +111,26 @@ resource "snowflake_table" "dw_sensor_master" {
   schema   = snowflake_schema.rpt_schema.name
   name     = "DW_SENSOR_MASTER"
 
-  column { name = "SENSOR_ID";       type = "VARCHAR"; nullable = false }
-  column { name = "METRIC_NAME";     type = "VARCHAR" }
-  column { name = "METRIC_VALUE";    type = "FLOAT" }
-  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
+  column {
+    name     = "SENSOR_ID"
+    type     = "VARCHAR"
+    nullable = false
+  }
+
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+
+  column {
+    name = "LAST_UPDATED_AT"
+    type = "TIMESTAMP_NTZ"
+  }
 
   lifecycle {
     ignore_changes = all
@@ -121,7 +145,6 @@ resource "snowflake_warehouse" "mfg_wh" {
   auto_resume    = true
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = all
+    ignore_changes = all
   }
 }
