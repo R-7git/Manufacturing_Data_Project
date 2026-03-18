@@ -38,7 +38,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  # --- 3. Kafka Connect (FIXED: Added this service) ---
+  # --- 3. Kafka Connect (FIXED: Added connectivity & auto-install) ---
   kafka-connect:
     image: confluentinc/cp-kafka-connect:7.5.0
     container_name: kafka-connect
@@ -47,7 +47,7 @@ services:
     ports:
       - "8083:8083"
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: 'kafka:29092' # Internal Docker address
+      CONNECT_BOOTSTRAP_SERVERS: 'kafka:29092'
       CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
       CONNECT_REST_PORT: 8083
       CONNECT_GROUP_ID: compose-connect-group
@@ -93,7 +93,7 @@ services:
       bash -c "pip install streamlit snowflake-connector-python pandas plotly && 
       streamlit run sensor_dashboard.py --server.port 8501 --server.address 0.0.0.0"
 
-  # --- 5. Airflow ---
+  # --- 5. Airflow (FIXED: Pinned dbt versions for faster startup) ---
   airflow:
     image: apache/airflow:2.7.2-python3.11
     container_name: airflow
@@ -102,7 +102,13 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       SNOWFLAKE_PASSWORD: "Rosh20090798395@"
-      _PIP_ADDITIONAL_REQUIREMENTS: dbt-snowflake faker confluent-kafka minio apache-airflow-providers-slack
+      _PIP_ADDITIONAL_REQUIREMENTS: >
+        dbt-snowflake==1.8.3
+        dbt-core==1.8.3
+        faker 
+        confluent-kafka 
+        minio 
+        apache-airflow-providers-slack
     ports:
       - "8080:8080"
     volumes:
@@ -131,12 +137,19 @@ services:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # --- 6. MinIO (FIXED: Added Root Credentials) ---
   minio:
     image: minio/minio:latest
     container_name: minio
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
     ports:
       - "9000:9000"
+      - "9001:9001"
     command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
 
 volumes:
   minio_data:
