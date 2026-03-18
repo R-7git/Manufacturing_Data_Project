@@ -1,15 +1,11 @@
 {{ config(
-    materialized='materialized_view',
-    schema='RPT_SCHEMA',
-    database='DW_DB'
+    materialized='view' 
 ) }}
 
 SELECT 
-    SENSOR_ID,
-    METRIC_NAME,
-    AVG(METRIC_VALUE) AS AVG_VALUE,
-    MAX(METRIC_VALUE) AS PEAK_VALUE,
-    COUNT(*) AS TOTAL_READINGS,
-    CURRENT_TIMESTAMP() AS LAST_REFRESHED_AT
+    metric_name,
+    AVG(metric_value) as avg_value,
+    COUNT(*) as total_readings,
+    MAX(last_updated_at) as last_reading_at
 FROM {{ ref('rpt_sensor_master') }}
-GROUP BY 1, 2
+GROUP BY 1
