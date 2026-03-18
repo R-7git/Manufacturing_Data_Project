@@ -47,9 +47,7 @@ stages {
             dir('infrastructure/terraform/snowflake') {
                 sh '''
                     set -e
-
                     rm -rf .terraform .terraform.lock.hcl
-
                     terraform init -upgrade -input=false
                     terraform apply -auto-approve -input=false
                 '''
@@ -63,7 +61,6 @@ stages {
 
             sh '''
                 set -e
-
                 curl -f -X POST "$AIRFLOW_URL" \
                   -H "Content-Type: application/json" \
                   --user "$AF_CREDS_USR:$AF_CREDS_PSW" \
