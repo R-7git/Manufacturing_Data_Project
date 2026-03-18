@@ -29,14 +29,12 @@ pipeline {
 
                     echo "Downloading Terraform ${TF_VERSION}..."
 
-                    # Retry logic (important)
                     for i in 1 2 3; do
-                        curl -f -L "https://releases.hashicorp.com/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip && break
+                        curl -f -L "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip && break
                         echo "Retry \$i failed... retrying"
                         sleep 5
                     done
 
-                    # Ensure file exists
                     if [ ! -f terraform.zip ]; then
                         echo "Download failed!"
                         exit 1
