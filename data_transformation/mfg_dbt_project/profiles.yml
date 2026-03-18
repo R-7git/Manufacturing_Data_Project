@@ -3,11 +3,15 @@ mfg_dbt_project:
   outputs:
     dev:
       type: snowflake
-      # Added a default string as a second argument to clear the IDE errors
       account: "{{ env_var('TF_VAR_snowflake_account', 'BKVGNQZ-UO15536') }}"
       user: "{{ env_var('TF_VAR_snowflake_user', 'ROSHAN') }}" 
       password: "{{ env_var('SNOWFLAKE_PASSWORD', 'Rosh20090798395@') }}"
-      role: SYSADMIN
-      database: "{{ env_var('SNOWFLAKE_DATABASE', 'MFG_BRONZE_DB') }}" 
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'KAFKA_INGEST') }}"     
-      warehouse: COMPUTE_WH
+      # Use ACCOUNTADMIN as established in your Terraform/Jenkins setup
+      role: ACCOUNTADMIN
+      # Point to your Terraform-created staging area
+      database: STG_DB
+      schema: STG_SCHEMA
+      # Point to your Terraform-created warehouse
+      warehouse: MFG_WH
+      threads: 4
+      client_session_keep_alive: False

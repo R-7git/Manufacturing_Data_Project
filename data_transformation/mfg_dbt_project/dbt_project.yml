@@ -17,20 +17,20 @@ clean-targets:
 
 models:
   mfg_dbt_project:
-    # 1. Bronze: Raw Ingestion Layer (Mapped to MFG_BRONZE_DB.RAW_DATA)
+    # 1. Bronze/Staging: Raw Ingestion (Mapped to STG_DB.STG_SCHEMA)
     bronze:
-      +database: MFG_BRONZE_DB
-      +schema: RAW_DATA
+      +database: STG_DB
+      +schema: STG_SCHEMA
       +materialized: view
 
-    # 2. Silver: Cleaned/Transformed Layer (Mapped to MFG_SILVER_DB.STAGING_CLEANED)
+    # 2. Silver/Reporting: Transformed Layer (Mapped to DW_DB.RPT_SCHEMA)
     silver:
-      +database: MFG_SILVER_DB
-      +schema: STAGING_CLEANED
+      +database: DW_DB
+      +schema: RPT_SCHEMA
       +materialized: table
 
-    # 3. Gold: Business/Reporting Layer (Mapped to MFG_GOLD_DB.DATA_MARTS)
+    # 3. Gold: Final Analytics (Mapped to DW_DB.RPT_SCHEMA)
     gold:
-      +database: MFG_GOLD_DB
-      +schema: DATA_MARTS
+      +database: DW_DB
+      +schema: RPT_SCHEMA
       +materialized: table
