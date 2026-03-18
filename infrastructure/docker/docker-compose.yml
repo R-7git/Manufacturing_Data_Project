@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   # --- 1. Background Data Factory ---
+  
   data-producer:
     image: apache/airflow:2.7.2-python3.11
     container_name: mfg-data-producer
@@ -10,12 +11,14 @@ services:
     user: "50000:0"
     working_dir: /opt/airflow/project
     command: >
-      bash -c "pip install faker && 
+      bash -c "pip install faker pandas && 
       while true; do 
-        python3 /opt/airflow/project/scripts/setup/manufacturing_data_producer.py; 
+        echo '--- Starting Data Production Batch ---' &&
+        python3 /opt/airflow/project/scripts/setup/manufacturing_data_producer.py || echo 'Script Failed!' &&
         sleep 300; 
       done"
     restart: always
+
 
   # --- 2. Kafka Infrastructure ---
   zookeeper:
