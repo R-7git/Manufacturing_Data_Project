@@ -1,29 +1,17 @@
 {{ config(
     materialized='incremental',
-    unique_key='SENSOR_ID',
-    schema='RPT_SCHEMA',
-    database='DW_DB',
+    unique_key='sensor_id',
     incremental_strategy='merge'
 ) }}
 
-WITH stream_data AS (
-    -- This is the CDC Stream created by Terraform
-    SELECT 
-        SENSOR_ID,
-        METRIC_NAME,
-        METRIC_VALUE,
-        INGESTION_TIMESTAMP,
-        METADATA_FILENAME,
-        METADATA$ACTION,    -- Snowflake Stream Metadata
-        METADATA$ISUPDATE   -- Snowflake Stream Metadata
-    FROM {{ source('stg_db', 'SENSOR_DATA_STREAM') }}
-    WHERE METADATA$ACTION = 'INSERT' -- Only process new/changed records
-)
-
 SELECT 
-    SENSOR_ID,
-    METRIC_NAME,
-    METRIC_VALUE,
-    INGESTION_TIMESTAMP AS LAST_UPDATED_AT,
-    METADATA_FILENAME
-FROM stream_data
+    sensor_id,
+    metric_name,
+    metric_value,
+    ingestion_timestamp AS last_updated_at
+FROM {{ ref('bronze_sensor_data') }}
+
+{% if is_incremental() %}
+  -- This filter ensures we only process new data from the stream/staging
+  WHERE ingestion_timestamp > (SELECT MAX(last_updated_at) FROM {{ this }})
+{% endif %}

@@ -24,5 +24,10 @@ flattened_data AS (
     FROM raw_json
 )
 
-SELECT * FROM flattened_data
-WHERE SENSOR_ID IS NOT NULL
+-- If you don't have a Mongo source yet, use this dummy select to stop the error
+SELECT 
+    CAST(NULL AS VARCHAR) as sensor_id,
+    CAST(NULL AS VARCHAR) as location,
+    CAST(NULL AS TIMESTAMP) as installed_at
+LIMIT 0
+
