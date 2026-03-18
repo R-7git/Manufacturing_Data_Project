@@ -9,18 +9,50 @@ pipeline {
         TF_VAR_snowflake_account  = "BKVGNQZ-UO15536"
         SF_CREDS = credentials('snowflake-user')
         AF_CREDS = credentials('airflow-credentials')
+        TF_BIN     = "${WORKSPACE}/terraform_bin"
+        TF_VERSION = "1.6.6"
+        PATH = "${WORKSPACE}/terraform_bin:${env.PATH}"
         AIRFLOW_URL = "http://airflow:8080/api/v1/dags/mfg_enterprise_automated_pipeline/dagRuns"
     }
 
     stages {
 
-        stage('Step 1: Deploy Snowflake Infrastructure') {
-            agent {
-                docker {
-                    image 'hashicorp/terraform:1.6.6'
-                    args '-u root'   // avoids permission issues
-                }
+        stage('Step 0: Setup Terraform') {
+            steps {
+                sh """
+                    set -e
+
+                    mkdir -p "${TF_BIN}"
+
+                    echo "Checking network..."
+                    curl -I https://releases.hashicorp.com || true
+
+                    echo "Downloading Terraform ${TF_VERSION}..."
+
+                    # Retry logic (important)
+                    for i in 1 2 3; do
+                        curl -f -L "https://releases.hashicorp.com/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip && break
+                        echo "Retry \$i failed... retrying"
+                        sleep 5
+                    done
+
+                    # Ensure file exists
+                    if [ ! -f terraform.zip ]; then
+                        echo "Download failed!"
+                        exit 1
+                    fi
+
+                    unzip -o terraform.zip -d "${TF_BIN}"
+                    chmod +x "${TF_BIN}/terraform"
+                    rm -f terraform.zip
+
+                    echo "Terraform version:"
+                    "${TF_BIN}/terraform" -version
+                """
             }
+        }
+
+        stage('Step 1: Deploy Snowflake Infrastructure') {
             environment {
                 TF_VAR_snowflake_user     = "${SF_CREDS_USR}"
                 TF_VAR_snowflake_password = "${SF_CREDS_PSW}"
@@ -30,8 +62,8 @@ pipeline {
                     sh """
                         set -e
                         rm -rf .terraform .terraform.lock.hcl
-                        terraform init -upgrade -input=false
-                        terraform apply -auto-approve -input=false
+                        "${TF_BIN}/terraform" init -upgrade -input=false
+                        "${TF_BIN}/terraform" apply -auto-approve -input=false
                     """
                 }
             }
@@ -52,7 +84,10 @@ pipeline {
 
     post {
         always {
-            deleteDir()
+            script {
+                sh "rm -rf ${env.TF_BIN} || true"
+                deleteDir()
+            }
         }
     }
 }
