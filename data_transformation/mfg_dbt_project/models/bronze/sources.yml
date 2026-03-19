@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: bronze_layer
+    database: MFG_BRONZE_DB
+    schema: KAFKA_INGEST
+    tables:
+      - name: MANUFACTURING_DATA  # This must match your Kafka Sink 'topics' config
