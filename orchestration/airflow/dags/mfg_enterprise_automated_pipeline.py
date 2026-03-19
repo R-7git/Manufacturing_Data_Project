@@ -1,18 +1,35 @@
 from airflow import DAG
 from airflow.sensors.filesystem import FileSensor
 from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
 from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
+import requests
 from datetime import datetime, timedelta
 
 def send_slack_alert(context):
     slack_msg = f":red_circle: *PIPELINE FAILURE*\n*Task*: {context.get('task_instance').task_id}"
     alert = SlackWebhookOperator(
         task_id='slack_failure_notification',
-        http_conn_id='slack_conn',
+        slack_webhook_conn_id='slack_conn',  # Fixed argument name
         message=slack_msg,
         channel='#data-alerts'
     )
     return alert.execute(context=context)
+
+# New Python-based health check (No jq required)
+def check_kafka_status():
+    try:
+        response = requests.get("http://localhost:8083/connectors/mfg_snowflake_sink/status")
+        response.raise_for_status()
+        data = response.json()
+        # Accessing the state of the first task
+        status = data['tasks'][0]['state']
+        if status != "RUNNING":
+            raise ValueError(f"Connector task is in {status} state!")
+        print(f"Connector is healthy and RUNNING.")
+    except Exception as e:
+        print(f"Health check failed: {str(e)}")
+        raise
 
 default_args = {
     'owner': 'roshan',
@@ -29,7 +46,7 @@ with DAG(
     catchup=False,
 ) as dag:
 
-    # 1. SENSOR: Wait for raw parquet data from manufacturing floor
+    # 1. SENSOR
     wait_for_files = FileSensor(
         task_id='sense_incoming_files',
         filepath='/opt/airflow/project/landing_zone/mfg_sensor_batch_*.parquet',
@@ -39,25 +56,19 @@ with DAG(
         mode='poke'
     )
 
-    # 2. UPLOAD TO MINIO: Archive a raw copy in the Data Lake
+    # 2. UPLOAD TO MINIO
     upload_to_lake = BashOperator(
         task_id='upload_to_minio_lake',
         bash_command='python3 /opt/airflow/project/scripts/setup/minio_data_uploader.py'
     )
 
-    # 3. CONNECTOR HEALTH CHECK: Ensure the Kafka-to-Snowflake sink is actually active
-    check_connector_status = BashOperator(
+    # 3. HEALTH CHECK (Now using Python Operator to avoid 'jq' requirement)
+    check_connector_status = PythonOperator(
         task_id='check_kafka_connector_health',
-        bash_command="""
-        STATUS=$(curl -s localhost:8083/connectors/mfg_snowflake_sink/status | jq -r '.tasks[0].state');
-        if [ "$STATUS" != "RUNNING" ]; then
-            echo "Kafka Connector is $STATUS. Failing pipeline to prevent data gap."
-            exit 1
-        fi
-        """
+        python_callable=check_kafka_status
     )
 
-    # 4. INGESTION: Load data from MinIO stage to Snowflake STG_SENSOR_DATA
+    # 4. INGESTION TO STAGING
     ingest_to_stg = BashOperator(
         task_id='snowflake_copy_ingestion',
         bash_command="""
@@ -66,7 +77,7 @@ with DAG(
         """
     )
 
-    # 5. DBT TRANSFORMATION: Build the Silver and Gold layers
+    # 5. DBT TRANSFORMATION
     run_dbt = BashOperator(
         task_id='dbt_medallion_transformation',
         bash_command="""
@@ -75,7 +86,7 @@ with DAG(
         """
     )
 
-    # 6. CLEANUP: Move processed files from landing_zone to archive
+    # 6. VALIDATION & ARCHIVE
     validate_and_archive = BashOperator(
         task_id='validate_and_cleanup',
         bash_command="""
@@ -85,5 +96,4 @@ with DAG(
         """
     )
 
-    # Simplified Dependency Flow
     wait_for_files >> upload_to_lake >> check_connector_status >> ingest_to_stg >> run_dbt >> validate_and_archive
