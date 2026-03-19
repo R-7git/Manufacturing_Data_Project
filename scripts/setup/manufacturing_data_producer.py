@@ -32,19 +32,26 @@ def client_utility_process(file_path):
     parquet_path = file_path.replace(".csv", ".parquet")
     df.to_parquet(parquet_path, index=False)
     
+    # Clean up the raw CSV to keep Landing Zone tidy
+    os.remove(file_path)
+    
     print(f"✅ Utility: Converted {file_path} to {parquet_path}")
     return parquet_path
 
 if __name__ == "__main__":
-    # 1. Define the filename pattern Airflow is looking for
-    file_name = f"mfg_sensor_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    file_path = os.path.join("/opt/airflow/project", file_name)
+    # Define Professional Folder Structure
+    base_dir = "/opt/airflow/project"
+    landing_zone = os.path.join(base_dir, "landing_zone")
+    os.makedirs(landing_zone, exist_ok=True)
 
-    # 2. Generate and Save CSV
+    # Define Filename and Path
+    file_name = f"mfg_sensor_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    file_path = os.path.join(landing_zone, file_name)
+
+    # Generate and Save CSV
     print(f"🚀 Generating data for {file_name}...")
     df = generate_sensor_data(150)
     df.to_csv(file_path, index=False)
-    print(f"💾 Saved CSV to {file_path}")
-
-    # 3. Process with Utility
+    
+    # Process with Utility (Converts to Parquet and Deletes CSV)
     client_utility_process(file_path)

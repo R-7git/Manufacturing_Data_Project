@@ -29,10 +29,10 @@ with DAG(
     catchup=False,
 ) as dag:
 
-    # 1. SENSOR: Wait for CSV files (Instead of failing, it will 'poke' every 60s)
+    # 1. SENSOR: Look in landing_zone for Parquet files
     wait_for_files = FileSensor(
-        task_id='sense_incoming_csv_files',
-        filepath='mfg_sensor_batch_*.csv',
+        task_id='sense_incoming_files',
+        filepath='landing_zone/mfg_sensor_batch_*.parquet',
         fs_conn_id='fs_default',
         poke_interval=60,
         timeout=600,
@@ -63,13 +63,13 @@ with DAG(
         """
     )
 
-    # 5. VALIDATION & ARCHIVE
+    # 5. VALIDATION & ARCHIVE (Move from landing_zone to archive)
     validate_and_archive = BashOperator(
         task_id='validate_and_cleanup',
         bash_command="""
         python3 /opt/airflow/project/scripts/setup/data_comparator_utility.py && \
         mkdir -p /opt/airflow/project/archive && \
-        mv /opt/airflow/project/mfg_sensor_batch_*.csv /opt/airflow/project/archive/
+        mv /opt/airflow/project/landing_zone/mfg_sensor_batch_*.parquet /opt/airflow/project/archive/
         """
     )
 
