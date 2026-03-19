@@ -23,7 +23,8 @@ provider "snowflake" {
   role     = "ACCOUNTADMIN"
 }
 
-# ---------------- NEW: BRONZE INFRA (FOR KAFKA) ----------------
+# ---------------- 1. BRONZE INFRA (KAFKA LANDING) ----------------
+
 resource "snowflake_database" "mfg_bronze_db" {
   name    = "MFG_BRONZE_DB"
   comment = "Landing zone for raw Kafka ingestion"
@@ -34,6 +35,22 @@ resource "snowflake_schema" "kafka_ingest" {
   name     = "KAFKA_INGEST"
 }
 
+resource "snowflake_table" "manufacturing_data" {
+  database = snowflake_database.mfg_bronze_db.name
+  schema   = snowflake_schema.kafka_ingest.name
+  name     = "MANUFACTURING_DATA"
+
+  column {
+    name = "RECORD_METADATA"
+    type = "VARIANT"
+  }
+
+  column {
+    name = "RECORD_CONTENT"
+    type = "VARIANT"
+  }
+}
+
 resource "snowflake_warehouse" "ingest_wh" {
   name           = "INGEST_WH"
   warehouse_size = "XSMALL"
@@ -41,7 +58,8 @@ resource "snowflake_warehouse" "ingest_wh" {
   auto_resume    = true
 }
 
-# ---------------- EXISTING DATABASES ----------------
+# ---------------- 2. EXISTING DATABASES (Managed via DBT) ----------------
+
 resource "snowflake_database" "stg_db" {
   name = "STG_DB"
   lifecycle { ignore_changes = all }
@@ -52,7 +70,8 @@ resource "snowflake_database" "dw_db" {
   lifecycle { ignore_changes = all }
 }
 
-# ---------------- SCHEMAS ----------------
+# ---------------- 3. SCHEMAS ----------------
+
 resource "snowflake_schema" "stg_schema" {
   database = snowflake_database.stg_db.name
   name     = "STG_SCHEMA"
@@ -65,7 +84,8 @@ resource "snowflake_schema" "rpt_schema" {
   lifecycle { ignore_changes = all }
 }
 
-# ---------------- EXTERNAL STAGE ----------------
+# ---------------- 4. STORAGE & STAGING ----------------
+
 resource "snowflake_stage" "minio_stage" {
   name     = "MINIO_RAW_STAGE"
   database = snowflake_database.stg_db.name
@@ -73,7 +93,6 @@ resource "snowflake_stage" "minio_stage" {
   lifecycle { ignore_changes = all }
 }
 
-# ---------------- STAGING TABLE ----------------
 resource "snowflake_table" "stg_sensor_data" {
   database = snowflake_database.stg_db.name
   schema   = snowflake_schema.stg_schema.name
@@ -103,7 +122,8 @@ resource "snowflake_table" "stg_sensor_data" {
   lifecycle { ignore_changes = all }
 }
 
-# ---------------- DW TABLE ----------------
+# ---------------- 5. DATA WAREHOUSE LAYER ----------------
+
 resource "snowflake_table" "dw_sensor_master" {
   database = snowflake_database.dw_db.name
   schema   = snowflake_schema.rpt_schema.name
@@ -130,7 +150,8 @@ resource "snowflake_table" "dw_sensor_master" {
   lifecycle { ignore_changes = all }
 }
 
-# ---------------- EXISTING WAREHOUSE ----------------
+# ---------------- 6. WAREHOUSES ----------------
+
 resource "snowflake_warehouse" "mfg_wh" {
   name           = "MFG_WH"
   warehouse_size = "XSMALL"
