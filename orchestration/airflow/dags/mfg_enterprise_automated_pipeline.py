@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.sensors.filesystem import FileSensor
 from airflow.operators.bash import BashOperator
+from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
 from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
 from datetime import datetime, timedelta
 
@@ -29,23 +30,46 @@ with DAG(
     catchup=False,
 ) as dag:
 
-    # 1. SENSOR: Look in landing_zone for Parquet files
+    # 1. NEW: Ensure Snowflake Infrastructure exists (Fixes "DB does not exist" error)
+    setup_snowflake_infra = SnowflakeOperator(
+        task_id='setup_snowflake_infrastructure',
+        sql="""
+            CREATE DATABASE IF NOT EXISTS MFG_BRONZE_DB;
+            CREATE SCHEMA IF NOT EXISTS MFG_BRONZE_DB.KAFKA_INGEST;
+            CREATE WAREHOUSE IF NOT EXISTS INGEST_WH WITH WAREHOUSE_SIZE='XSMALL' AUTO_SUSPEND=60;
+        """,
+        snowflake_conn_id='snowflake_default'
+    )
+
+    # 2. SENSOR: Look in landing_zone for Parquet files
     wait_for_files = FileSensor(
         task_id='sense_incoming_files',
-        filepath='landing_zone/mfg_sensor_batch_*.parquet',
+        filepath='/opt/airflow/project/landing_zone/mfg_sensor_batch_*.parquet',
         fs_conn_id='fs_default',
         poke_interval=60,
         timeout=600,
         mode='poke'
     )
 
-    # 2. UPLOAD TO MINIO
+    # 3. UPLOAD TO MINIO (Data Lake)
     upload_to_lake = BashOperator(
         task_id='upload_to_minio_lake',
         bash_command='python3 /opt/airflow/project/scripts/setup/minio_data_uploader.py'
     )
 
-    # 3. INGESTION TO SNOWFLAKE
+    # 4. CONNECTOR HEALTH CHECK: Ensure Kafka Sink isn't crashed (Fixes "Fake Green" status)
+    check_connector_status = BashOperator(
+        task_id='check_kafka_connector_health',
+        bash_command="""
+        STATUS=$(curl -s localhost:8083/connectors/mfg_snowflake_sink/status | jq -r '.tasks[0].state');
+        if [ "$STATUS" != "RUNNING" ]; then
+            echo "Connector is $STATUS. Failing task.";
+            exit 1;
+        fi
+        """
+    )
+
+    # 5. INGESTION TO STAGING
     ingest_to_stg = BashOperator(
         task_id='snowflake_copy_ingestion',
         bash_command="""
@@ -54,7 +78,7 @@ with DAG(
         """
     )
 
-    # 4. DBT TRANSFORMATION
+    # 6. DBT TRANSFORMATION (Medallion: Bronze -> Silver -> Gold)
     run_dbt = BashOperator(
         task_id='dbt_medallion_transformation',
         bash_command="""
@@ -63,7 +87,7 @@ with DAG(
         """
     )
 
-    # 5. VALIDATION & ARCHIVE (Move from landing_zone to archive)
+    # 7. VALIDATION & ARCHIVE
     validate_and_archive = BashOperator(
         task_id='validate_and_cleanup',
         bash_command="""
@@ -73,4 +97,5 @@ with DAG(
         """
     )
 
-    wait_for_files >> upload_to_lake >> ingest_to_stg >> run_dbt >> validate_and_archive
+    # Dependency Graph
+    setup_snowflake_infra >> wait_for_files >> upload_to_lake >> check_connector_status >> ingest_to_stg >> run_dbt >> validate_and_archive
