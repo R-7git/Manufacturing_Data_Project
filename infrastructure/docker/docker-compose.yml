@@ -15,7 +15,7 @@ services:
       while true; do 
         echo '--- Starting Data Production Batch ---' &&
         python3 /opt/airflow/project/scripts/setup/manufacturing_data_producer.py || echo 'Script Failed!' &&
-        sleep 300; 
+        sleep 60; 
       done"
     restart: always
 
