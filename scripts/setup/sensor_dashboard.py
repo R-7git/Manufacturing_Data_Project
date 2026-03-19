@@ -14,8 +14,8 @@ def get_conn():
         user=os.getenv("SNOWFLAKE_USER"),
         password=os.getenv("SNOWFLAKE_PASSWORD"),
         account=os.getenv("SNOWFLAKE_ACCOUNT"),
-        warehouse="COMPUTE_WH",  # Updated to match your current Docker environment
-        database="MFG_BRONZE_DB", # Pointing to where Kafka lands the data
+        warehouse="COMPUTE_WH", 
+        database="MFG_BRONZE_DB",
         schema="KAFKA_INGEST"
     )
 
@@ -28,8 +28,7 @@ while True:
         try:
             conn = get_conn()
             
-            # Query the raw Kafka table we verified in MinIO
-            # Parsing the VARIANT 'RECORD_CONTENT' into columns
+            # UPDATED: Table name must match the Kafka Topic 'MFG_SENSOR_STREAM'
             query = """
             SELECT 
                 RECORD_CONTENT:sensor_id::STRING as SENSOR_ID,
@@ -37,35 +36,40 @@ while True:
                 RECORD_CONTENT:metric_value::FLOAT as CURRENT_VALUE,
                 RECORD_CONTENT:status::STRING as STATUS,
                 RECORD_CONTENT:ingestion_timestamp::TIMESTAMP as TS
-            FROM MANUFACTURING_DATA
+            FROM MFG_SENSOR_STREAM
             ORDER BY TS DESC
             LIMIT 200
             """
             df = pd.read_sql(query, conn)
 
-            # --- 3. Filters ---
-            sensor_list = df['SENSOR_ID'].unique()
-            selected_sensor = st.sidebar.multiselect("Filter by Sensor ID", sensor_list, default=sensor_list)
-            filtered_df = df[df['SENSOR_ID'].isin(selected_sensor)]
+            if df.empty:
+                st.warning("Connected to Snowflake, but 'MFG_SENSOR_STREAM' table is currently empty. Start your producer!")
+            else:
+                # --- 3. Filters ---
+                sensor_list = df['SENSOR_ID'].unique()
+                selected_sensor = st.sidebar.multiselect("Filter by Sensor ID", sensor_list, default=sensor_list)
+                filtered_df = df[df['SENSOR_ID'].isin(selected_sensor)]
 
-            # --- 4. Layout ---
-            col1, col2 = st.columns(2)
+                # --- 4. Layout ---
+                col1, col2 = st.columns(2)
 
-            with col1:
-                st.subheader("Metric Distribution (Box Plot)")
-                fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="STATUS")
-                st.plotly_chart(fig1, use_container_width=True)
+                with col1:
+                    st.subheader("Metric Distribution (Box Plot)")
+                    fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="STATUS",
+                                 color_discrete_map={'OK': 'green', 'WARNING': 'orange', 'CRITICAL': 'red'})
+                    st.plotly_chart(fig1, use_container_width=True)
 
-            with col2:
-                st.subheader("Vibration Trend")
-                fig2 = px.line(filtered_df, x="TS", y="CURRENT_VALUE", color="SENSOR_ID")
-                st.plotly_chart(fig2, use_container_width=True)
+                with col2:
+                    st.subheader("Vibration Trend")
+                    fig2 = px.line(filtered_df, x="TS", y="CURRENT_VALUE", color="SENSOR_ID")
+                    st.plotly_chart(fig2, use_container_width=True)
 
-            st.subheader("Live Raw Records")
-            st.dataframe(filtered_df.head(20), use_container_width=True)
+                st.subheader("Live Raw Records")
+                st.dataframe(filtered_df.head(20), use_container_width=True)
 
         except Exception as e:
-            st.error(f"Waiting for Snowflake data... {e}")
+            st.error(f"Error fetching data: {e}")
+            st.info("Check if the table 'MFG_SENSOR_STREAM' exists in Snowflake under MFG_BRONZE_DB.KAFKA_INGEST")
         
         # --- 5. Refresh every 5 seconds ---
         time.sleep(5)
