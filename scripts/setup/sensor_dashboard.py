@@ -37,7 +37,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Metric Distribution")
-    fig1 = px.box(filtered_df, x="METRIC_NAME", y="METRIC_VALUE", color="METRIC_NAME")
+    fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="METRIC_NAME")
     st.plotly_chart(fig1)
 
 with col2:

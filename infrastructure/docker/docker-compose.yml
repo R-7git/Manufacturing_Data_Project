@@ -2,7 +2,6 @@ version: '3.8'
 
 services:
   # --- 1. Background Data Factory ---
-  
   data-producer:
     image: apache/airflow:2.7.2-python3.11
     container_name: mfg-data-producer
@@ -18,7 +17,6 @@ services:
         sleep 60; 
       done"
     restart: always
-
 
   # --- 2. Kafka Infrastructure ---
   zookeeper:
@@ -50,6 +48,8 @@ services:
       - kafka
     ports:
       - "8083:8083"
+    volumes:
+      - /Users/ms/Desktop/Manufacturing_Data_Project/data_ingestion/kafka/connectors:/etc/kafka-connect/custom-configs
     environment:
       CONNECT_BOOTSTRAP_SERVERS: 'kafka:29092'
       CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
@@ -62,7 +62,8 @@ services:
       CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: com.snowflake.kafka.connector.records.SnowflakeJsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
     command: 
       - bash 
@@ -73,7 +74,43 @@ services:
         /etc/confluent/docker/run
     restart: always
 
-  # --- 4. Kafka UI ---
+  # --- 4. Pipeline Automation (NEW: Automates MinIO & Snowflake Connector) ---
+  pipeline-init:
+    image: curlimages/curl:latest
+    container_name: pipeline-init
+    user: root
+    volumes:
+      - /Users/ms/Desktop/Manufacturing_Data_Project/data_ingestion/kafka/connectors:/configs
+    depends_on:
+      - kafka-connect
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for Kafka Connect...';
+      while [ $$(curl -s -o /dev/null -w %{http_code} http://kafka-connect:8083/connectors) -ne 200 ]; do sleep 5; done;
+      
+      echo 'Registering Snowflake Connector...';
+      curl -X POST -H 'Content-Type: application/json' -d @/configs/snowflake_connector.json http://kafka-connect:8083/connectors;
+      
+      echo 'Setting up MinIO Bucket...';
+      curl http://minio:9000; # Simple check
+      # Note: For advanced MinIO CLI automation, we use the minio/mc image or a simple curl to a setup proxy.
+      # Since we want one-shot: we'll use a secondary container or the MC command below.
+      echo 'Pipeline Initialization Complete.';"
+
+  minio-setup:
+    image: minio/mc
+    container_name: minio-setup
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://minio:9000 admin password123) do echo 'Waiting for MinIO...'; sleep 2; done;
+      /usr/bin/mc mb myminio/kafka-archive || true;
+      exit 0;
+      "
+
+  # --- 5. Kafka UI ---
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -90,7 +127,7 @@ services:
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
     restart: always
 
-  # --- 5. BI & Apps ---
+  # --- 6. BI & Apps ---
   metabase:
     image: metabase/metabase:latest
     container_name: metabase
@@ -114,7 +151,7 @@ services:
       bash -c "pip install streamlit snowflake-connector-python pandas plotly && 
       streamlit run sensor_dashboard.py --server.port 8501 --server.address 0.0.0.0"
 
-  # --- 6. Airflow (Updated with AUTO-CONNECTION CREATION) ---
+  # --- 7. Airflow ---
   airflow:
     image: apache/airflow:2.7.2-python3.11
     container_name: airflow
@@ -160,7 +197,7 @@ services:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
 
-  # --- 7. MinIO ---
+  # --- 8. MinIO ---
   minio:
     image: minio/minio:latest
     container_name: minio
