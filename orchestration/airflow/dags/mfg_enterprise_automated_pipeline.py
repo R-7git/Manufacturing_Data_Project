@@ -10,19 +10,23 @@ def send_slack_alert(context):
     slack_msg = f":red_circle: *PIPELINE FAILURE*\n*Task*: {context.get('task_instance').task_id}"
     alert = SlackWebhookOperator(
         task_id='slack_failure_notification',
-        slack_webhook_conn_id='slack_conn',  # Fixed argument name
+        slack_webhook_conn_id='slack_conn', 
         message=slack_msg,
         channel='#data-alerts'
     )
     return alert.execute(context=context)
 
-# New Python-based health check (No jq required)
+# Fixed health check to use Docker service name
 def check_kafka_status():
+    # 'kafka-connect' is the standard Docker service name. 
+    # Change to 'connect' if that is what's in your docker-compose.
+    url = "http://kafka-connect:8083/connectors/mfg_snowflake_sink/status"
     try:
-        response = requests.get("http://localhost:8083/connectors/mfg_snowflake_sink/status")
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        # Accessing the state of the first task
+        
+        # Accessing the state of the first task safely
         status = data['tasks'][0]['state']
         if status != "RUNNING":
             raise ValueError(f"Connector task is in {status} state!")
@@ -62,7 +66,7 @@ with DAG(
         bash_command='python3 /opt/airflow/project/scripts/setup/minio_data_uploader.py'
     )
 
-    # 3. HEALTH CHECK (Now using Python Operator to avoid 'jq' requirement)
+    # 3. HEALTH CHECK (Now using Python Operator with correct Docker networking)
     check_connector_status = PythonOperator(
         task_id='check_kafka_connector_health',
         python_callable=check_kafka_status
