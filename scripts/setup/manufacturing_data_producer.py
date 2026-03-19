@@ -39,8 +39,14 @@ def client_utility_process(file_path):
     return parquet_path
 
 if __name__ == "__main__":
-    # Define Professional Folder Structure
-    base_dir = "/opt/airflow/project"
+    # --- SMART PATH DETECTION ---
+    # If the Docker path exists, use it. Otherwise, use the current folder on your Mac.
+    if os.path.exists("/opt/airflow/project"):
+        base_dir = "/opt/airflow/project"
+    else:
+        # This will point to the root of your 'Manufacturing_Data_Project' folder on your Mac
+        base_dir = os.getcwd() 
+
     landing_zone = os.path.join(base_dir, "landing_zone")
     os.makedirs(landing_zone, exist_ok=True)
 
