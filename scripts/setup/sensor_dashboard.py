@@ -3,46 +3,70 @@ import snowflake.connector
 import pandas as pd
 import plotly.express as px
 import os
+import time
 
 st.set_page_config(page_title="MFG Sensor Analytics", layout="wide")
 
-st.title("🏭 Real-Time Manufacturing Sensor Dashboard")
-
-# Snowflake Connection
+# --- 1. Connection Logic ---
 @st.cache_resource
 def get_conn():
     return snowflake.connector.connect(
         user=os.getenv("SNOWFLAKE_USER"),
         password=os.getenv("SNOWFLAKE_PASSWORD"),
         account=os.getenv("SNOWFLAKE_ACCOUNT"),
-        warehouse="MFG_WH",
-        database="DW_DB",
-        schema="RPT_SCHEMA"
+        warehouse="COMPUTE_WH",  # Updated to match your current Docker environment
+        database="MFG_BRONZE_DB", # Pointing to where Kafka lands the data
+        schema="KAFKA_INGEST"
     )
 
-conn = get_conn()
+# --- 2. Live Dashboard Container ---
+st.title("🏭 Real-Time Manufacturing Sensor Dashboard")
+placeholder = st.empty()
 
-# Query Gold Data
-query = "SELECT * FROM V_SENSOR_ANALYTICS"
-df = pd.read_sql(query, conn)
+while True:
+    with placeholder.container():
+        try:
+            conn = get_conn()
+            
+            # Query the raw Kafka table we verified in MinIO
+            # Parsing the VARIANT 'RECORD_CONTENT' into columns
+            query = """
+            SELECT 
+                RECORD_CONTENT:sensor_id::STRING as SENSOR_ID,
+                RECORD_CONTENT:metric_name::STRING as METRIC_NAME,
+                RECORD_CONTENT:metric_value::FLOAT as CURRENT_VALUE,
+                RECORD_CONTENT:status::STRING as STATUS,
+                RECORD_CONTENT:ingestion_timestamp::TIMESTAMP as TS
+            FROM MANUFACTURING_DATA
+            ORDER BY TS DESC
+            LIMIT 200
+            """
+            df = pd.read_sql(query, conn)
 
-# Sidebar filters
-sensor_list = df['SENSOR_ID'].unique()
-selected_sensor = st.sidebar.multiselect("Filter by Sensor ID", sensor_list, default=sensor_list)
+            # --- 3. Filters ---
+            sensor_list = df['SENSOR_ID'].unique()
+            selected_sensor = st.sidebar.multiselect("Filter by Sensor ID", sensor_list, default=sensor_list)
+            filtered_df = df[df['SENSOR_ID'].isin(selected_sensor)]
 
-filtered_df = df[df['SENSOR_ID'].isin(selected_sensor)]
+            # --- 4. Layout ---
+            col1, col2 = st.columns(2)
 
-# Layout
-col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Metric Distribution (Box Plot)")
+                fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="STATUS")
+                st.plotly_chart(fig1, use_container_width=True)
 
-with col1:
-    st.subheader("Metric Distribution")
-    fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="METRIC_NAME")
-    st.plotly_chart(fig1)
+            with col2:
+                st.subheader("Vibration Trend")
+                fig2 = px.line(filtered_df, x="TS", y="CURRENT_VALUE", color="SENSOR_ID")
+                st.plotly_chart(fig2, use_container_width=True)
 
-with col2:
-    st.subheader("Sensor Health Summary")
-    st.dataframe(filtered_df.describe())
+            st.subheader("Live Raw Records")
+            st.dataframe(filtered_df.head(20), use_container_width=True)
 
-st.subheader("Raw Gold Records")
-st.write(filtered_df)
+        except Exception as e:
+            st.error(f"Waiting for Snowflake data... {e}")
+        
+        # --- 5. Refresh every 5 seconds ---
+        time.sleep(5)
+        st.rerun()
