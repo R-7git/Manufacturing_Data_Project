@@ -8,14 +8,8 @@ terraform {
 }
 
 # ---------------- VARIABLES ----------------
-variable "snowflake_account" {
-  type = string
-}
-
-variable "snowflake_user" {
-  type = string
-}
-
+variable "snowflake_account" { type = string }
+variable "snowflake_user"    { type = string }
 variable "snowflake_password" {
   type      = string
   sensitive = true
@@ -29,52 +23,54 @@ provider "snowflake" {
   role     = "ACCOUNTADMIN"
 }
 
-# ---------------- DATABASES ----------------
+# ---------------- NEW: BRONZE INFRA (FOR KAFKA) ----------------
+resource "snowflake_database" "mfg_bronze_db" {
+  name = "MFG_BRONZE_DB"
+  comment = "Landing zone for raw Kafka ingestion"
+}
+
+resource "snowflake_schema" "kafka_ingest" {
+  database = snowflake_database.mfg_bronze_db.name
+  name     = "KAFKA_INGEST"
+}
+
+resource "snowflake_warehouse" "ingest_wh" {
+  name           = "INGEST_WH"
+  warehouse_size = "XSMALL"
+  auto_suspend   = 60
+  auto_resume    = true
+}
+
+# ---------------- EXISTING DATABASES ----------------
 resource "snowflake_database" "stg_db" {
   name = "STG_DB"
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
 
 resource "snowflake_database" "dw_db" {
   name = "DW_DB"
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
 
 # ---------------- SCHEMAS ----------------
 resource "snowflake_schema" "stg_schema" {
   database = snowflake_database.stg_db.name
   name     = "STG_SCHEMA"
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
 
 resource "snowflake_schema" "rpt_schema" {
   database = snowflake_database.dw_db.name
   name     = "RPT_SCHEMA"
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
 
 # ---------------- EXTERNAL STAGE ----------------
 resource "snowflake_stage" "minio_stage" {
-  name        = "MINIO_RAW_STAGE"
-  database    = snowflake_database.stg_db.name
-  schema      = snowflake_schema.stg_schema.name
-  
-
-  lifecycle {
-    ignore_changes = all
-  }
+  name     = "MINIO_RAW_STAGE"
+  database = snowflake_database.stg_db.name
+  schema   = snowflake_schema.stg_schema.name
+  lifecycle { ignore_changes = all }
 }
 
 # ---------------- STAGING TABLE ----------------
@@ -83,34 +79,13 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
-  column {
-    name = "SENSOR_ID"
-    type = "VARCHAR"
-  }
+  column { name = "SENSOR_ID"; type = "VARCHAR" }
+  column { name = "METRIC_NAME"; type = "VARCHAR" }
+  column { name = "METRIC_VALUE"; type = "FLOAT" }
+  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ" }
+  column { name = "METADATA_FILENAME"; type = "VARCHAR" }
 
-  column {
-    name = "METRIC_NAME"
-    type = "VARCHAR"
-  }
-
-  column {
-    name = "METRIC_VALUE"
-    type = "FLOAT"
-  }
-
-  column {
-    name = "INGESTION_TIMESTAMP"
-    type = "TIMESTAMP_NTZ"
-  }
-
-  column {
-    name = "METADATA_FILENAME"
-    type = "VARCHAR"
-  }
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
 
 # ---------------- DW TABLE ----------------
@@ -119,40 +94,19 @@ resource "snowflake_table" "dw_sensor_master" {
   schema   = snowflake_schema.rpt_schema.name
   name     = "DW_SENSOR_MASTER"
 
-  column {
-    name     = "SENSOR_ID"
-    type     = "VARCHAR"
-    nullable = false
-  }
+  column { name = "SENSOR_ID"; type = "VARCHAR"; nullable = false }
+  column { name = "METRIC_NAME"; type = "VARCHAR" }
+  column { name = "METRIC_VALUE"; type = "FLOAT" }
+  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
 
-  column {
-    name = "METRIC_NAME"
-    type = "VARCHAR"
-  }
-
-  column {
-    name = "METRIC_VALUE"
-    type = "FLOAT"
-  }
-
-  column {
-    name = "LAST_UPDATED_AT"
-    type = "TIMESTAMP_NTZ"
-  }
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
 
-# ---------------- WAREHOUSE ----------------
+# ---------------- EXISTING WAREHOUSE ----------------
 resource "snowflake_warehouse" "mfg_wh" {
   name           = "MFG_WH"
   warehouse_size = "XSMALL"
   auto_suspend   = 60
   auto_resume    = true
-
-  lifecycle {
-    ignore_changes = all
-  }
+  lifecycle { ignore_changes = all }
 }
