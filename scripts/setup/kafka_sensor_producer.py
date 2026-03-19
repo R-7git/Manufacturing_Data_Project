@@ -4,7 +4,7 @@ import random
 from datetime import datetime
 from confluent_kafka import Producer
 
-# Kafka Configuration (Matching your Docker setup)
+# Kafka Configuration
 conf = {'bootstrap.servers': "localhost:9092"}
 producer = Producer(conf)
 
@@ -12,23 +12,24 @@ def delivery_report(err, msg):
     if err is not None:
         print(f"❌ Delivery failed: {err}")
     else:
-        # Simplified report for cleaner logs
         print(f"✅ Message {msg.offset() + 1} delivered to {msg.topic()}")
 
 def stream_sensor_data():
     topic = 'mfg_sensor_stream'
-    sensors = ['SNS-1001', 'SNS-1002', 'SNS-1003']
+    sensors = ['SNS-1001', 'SNS-1002', 'SNS-1003', 'SNS-1004']
     
-    print(f"🚀 Starting Real-Time Stream to Kafka Topic: {topic}...")
-    print("💡 NOTE: You need 10 messages to 'flush' a file into MinIO kafka-archive.")
+    print(f"🚀 Starting HIGH-SPEED Stream to: {topic}")
+    print("💡 Sending 50 messages rapidly to force a MinIO archival flush...")
     
     msg_count = 0
     try:
-        while True:
+        # Loop 50 times quickly to hit the connector's flush threshold
+        for i in range(50):
             data = {
                 'sensor_id': random.choice(sensors),
                 'metric_name': 'Vibration (Hz)',
                 'metric_value': round(random.uniform(50.0, 150.0), 2),
+                'status': random.choice(['OK', 'WARNING', 'CRITICAL']),
                 'ingestion_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
@@ -39,18 +40,20 @@ def stream_sensor_data():
                 callback=delivery_report
             )
             
-            # Flush immediately to ensure the connector sees it
-            producer.flush()
+            # Flush local buffer every 5 messages to ensure Kafka receives them
+            if i % 5 == 0:
+                producer.flush()
             
             msg_count += 1
-            if msg_count % 10 == 0:
-                print(f"🔔 Threshold reached! Check MinIO bucket: kafka-archive")
+            time.sleep(0.05) # 50ms delay between messages
             
-            # Stream faster (0.5s) to populate the archive quickly
-            time.sleep(0.5) 
-            
+        # Final flush to ensure all 50 are sent
+        producer.flush()
+        print(f"🏁 Burst complete. Total sent: {msg_count}")
+        print("👀 Refresh your MinIO 'kafka-archive' bucket now!")
+
     except KeyboardInterrupt:
-        print("\nStreaming stopped by user.")
+        print("\nStreaming stopped.")
 
 if __name__ == "__main__":
     stream_sensor_data()
