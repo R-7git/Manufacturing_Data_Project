@@ -8,8 +8,8 @@ terraform {
 }
 
 # ---------------- VARIABLES ----------------
-variable "snowflake_account" { type = string }
-variable "snowflake_user"    { type = string }
+variable "snowflake_account"  { type = string }
+variable "snowflake_user"     { type = string }
 variable "snowflake_password" {
   type      = string
   sensitive = true
@@ -25,7 +25,7 @@ provider "snowflake" {
 
 # ---------------- NEW: BRONZE INFRA (FOR KAFKA) ----------------
 resource "snowflake_database" "mfg_bronze_db" {
-  name = "MFG_BRONZE_DB"
+  name    = "MFG_BRONZE_DB"
   comment = "Landing zone for raw Kafka ingestion"
 }
 
@@ -79,11 +79,26 @@ resource "snowflake_table" "stg_sensor_data" {
   schema   = snowflake_schema.stg_schema.name
   name     = "STG_SENSOR_DATA"
 
-  column { name = "SENSOR_ID"; type = "VARCHAR" }
-  column { name = "METRIC_NAME"; type = "VARCHAR" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "INGESTION_TIMESTAMP"; type = "TIMESTAMP_NTZ" }
-  column { name = "METADATA_FILENAME"; type = "VARCHAR" }
+  column {
+    name = "SENSOR_ID"
+    type = "VARCHAR"
+  }
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+  column {
+    name = "INGESTION_TIMESTAMP"
+    type = "TIMESTAMP_NTZ"
+  }
+  column {
+    name = "METADATA_FILENAME"
+    type = "VARCHAR"
+  }
 
   lifecycle { ignore_changes = all }
 }
@@ -94,10 +109,23 @@ resource "snowflake_table" "dw_sensor_master" {
   schema   = snowflake_schema.rpt_schema.name
   name     = "DW_SENSOR_MASTER"
 
-  column { name = "SENSOR_ID"; type = "VARCHAR"; nullable = false }
-  column { name = "METRIC_NAME"; type = "VARCHAR" }
-  column { name = "METRIC_VALUE"; type = "FLOAT" }
-  column { name = "LAST_UPDATED_AT"; type = "TIMESTAMP_NTZ" }
+  column {
+    name     = "SENSOR_ID"
+    type     = "VARCHAR"
+    nullable = false
+  }
+  column {
+    name = "METRIC_NAME"
+    type = "VARCHAR"
+  }
+  column {
+    name = "METRIC_VALUE"
+    type = "FLOAT"
+  }
+  column {
+    name = "LAST_UPDATED_AT"
+    type = "TIMESTAMP_NTZ"
+  }
 
   lifecycle { ignore_changes = all }
 }
