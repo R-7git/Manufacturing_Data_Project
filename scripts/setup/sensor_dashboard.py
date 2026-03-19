@@ -14,8 +14,8 @@ def get_conn():
         user=os.getenv("SNOWFLAKE_USER"),
         password=os.getenv("SNOWFLAKE_PASSWORD"),
         account=os.getenv("SNOWFLAKE_ACCOUNT"),
-        warehouse="COMPUTE_WH", 
-        database="MFG_BRONZE_DB",
+        warehouse="COMPUTE_WH",  # Uses your active warehouse
+        database="MFG_BRONZE_DB", 
         schema="KAFKA_INGEST"
     )
 
@@ -28,7 +28,7 @@ while True:
         try:
             conn = get_conn()
             
-            # UPDATED: Table name must match the Kafka Topic 'MFG_SENSOR_STREAM'
+            # Use the FULL PATH seen in your Snowflake Database Explorer
             query = """
             SELECT 
                 RECORD_CONTENT:sensor_id::STRING as SENSOR_ID,
@@ -36,27 +36,25 @@ while True:
                 RECORD_CONTENT:metric_value::FLOAT as CURRENT_VALUE,
                 RECORD_CONTENT:status::STRING as STATUS,
                 RECORD_CONTENT:ingestion_timestamp::TIMESTAMP as TS
-            FROM MFG_SENSOR_STREAM
+            FROM MFG_BRONZE_DB.KAFKA_INGEST.MANUFACTURING_DATA
             ORDER BY TS DESC
             LIMIT 200
             """
             df = pd.read_sql(query, conn)
 
             if df.empty:
-                st.warning("Connected to Snowflake, but 'MFG_SENSOR_STREAM' table is currently empty. Start your producer!")
+                st.warning("Table is connected but empty. Start your producer script!")
             else:
                 # --- 3. Filters ---
                 sensor_list = df['SENSOR_ID'].unique()
-                selected_sensor = st.sidebar.multiselect("Filter by Sensor ID", sensor_list, default=sensor_list)
+                selected_sensor = st.sidebar.multiselect("Filter by Sensor", sensor_list, default=sensor_list)
                 filtered_df = df[df['SENSOR_ID'].isin(selected_sensor)]
 
                 # --- 4. Layout ---
                 col1, col2 = st.columns(2)
-
                 with col1:
-                    st.subheader("Metric Distribution (Box Plot)")
-                    fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="STATUS",
-                                 color_discrete_map={'OK': 'green', 'WARNING': 'orange', 'CRITICAL': 'red'})
+                    st.subheader("Metric Distribution")
+                    fig1 = px.box(filtered_df, x="METRIC_NAME", y="CURRENT_VALUE", color="STATUS")
                     st.plotly_chart(fig1, use_container_width=True)
 
                 with col2:
@@ -68,9 +66,8 @@ while True:
                 st.dataframe(filtered_df.head(20), use_container_width=True)
 
         except Exception as e:
-            st.error(f"Error fetching data: {e}")
-            st.info("Check if the table 'MFG_SENSOR_STREAM' exists in Snowflake under MFG_BRONZE_DB.KAFKA_INGEST")
+            st.error(f"Error: {e}")
         
-        # --- 5. Refresh every 5 seconds ---
+        # Refresh every 5 seconds
         time.sleep(5)
         st.rerun()
