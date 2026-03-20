@@ -6,6 +6,11 @@ import os
 import time
 from datetime import datetime, timedelta
 
+from dotenv import load_dotenv # <--- ADD THIS
+
+# Load the .env file explicitly
+load_dotenv()
+
 st.set_page_config(page_title="MFG Gold Analytics", layout="wide")
 
 # --- 1. Connection Logic (Points to Gold Layer) ---
