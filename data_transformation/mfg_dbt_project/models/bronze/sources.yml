@@ -5,4 +5,4 @@ sources:
     database: MFG_BRONZE_DB
     schema: KAFKA_INGEST
     tables:
-      - name: MFG_SENSOR_STREAM  # This must match your Kafka Sink 'topics' config
+      - name: MANUFACTURING_DATA  # This must match your Kafka Sink 'topics' config
