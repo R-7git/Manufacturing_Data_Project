@@ -6,13 +6,6 @@
 
 WITH source_data AS (
     SELECT * FROM {{ ref('bronze_sensor_data') }}
-),
-
--- Use QUALIFY to pick only the most recent record per sensor_id
-latest_records AS (
-    SELECT * 
-    FROM source_data
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY sensor_id ORDER BY last_updated_at DESC) = 1
 )
 
 SELECT 
@@ -20,8 +13,12 @@ SELECT
     metric_name,
     metric_value,
     last_updated_at
-FROM latest_records
+FROM source_data
 
 {% if is_incremental() %}
+  -- 1. First, filter for ONLY new data
   WHERE last_updated_at > (SELECT MAX(last_updated_at) FROM {{ this }})
 {% endif %}
+
+-- 2. Then, pick only the latest record per sensor to avoid the 'Duplicate' error
+QUALIFY ROW_NUMBER() OVER (PARTITION BY sensor_id ORDER BY last_updated_at DESC) = 1
