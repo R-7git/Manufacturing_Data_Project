@@ -3,7 +3,7 @@
   "config": {
     "connector.class": "com.snowflake.kafka.connector.SnowflakeSinkConnector",
     "tasks.max": "1",
-    "topics": "manufacturing_data",
+    "topics": "mfg_sensor_stream",
 
     "snowflake.url.name": "bkvgnqz-uo15536.snowflakecomputing.com",
     "snowflake.user.name": "ROSHAN",
