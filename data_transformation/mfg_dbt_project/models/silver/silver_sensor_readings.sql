@@ -12,3 +12,4 @@ SELECT
     last_updated_at AS "INGESTION_TIMESTAMP"
 FROM raw_data
 WHERE sensor_id IS NOT NULL
+ 
