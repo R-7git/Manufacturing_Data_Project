@@ -36,7 +36,7 @@ while True:
                 RECORD_CONTENT:metric_value::FLOAT as CURRENT_VALUE,
                 RECORD_CONTENT:status::STRING as STATUS,
                 RECORD_CONTENT:ingestion_timestamp::TIMESTAMP as TS
-            FROM MFG_BRONZE_DB.KAFKA_INGEST.MANUFACTURING_DATA
+            FROM MFG_BRONZE_DB.KAFKA_INGEST.MFG_SENSOR_STREAM
             ORDER BY TS DESC
             LIMIT 200
             """
