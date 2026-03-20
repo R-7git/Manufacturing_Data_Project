@@ -6,6 +6,7 @@ import os
 import time
 
 st.set_page_config(page_title="MFG Sensor Analytics", layout="wide")
+st.sidebar.success("Select a layer above for more detail.") # <
 
 # --- 1. Connection Logic ---
 @st.cache_resource
